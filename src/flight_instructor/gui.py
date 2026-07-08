@@ -62,7 +62,7 @@ class App(tk.Tk):
         self.configure(bg=_BG)
 
         self._build_ui()
-        self._try_connect()
+        self.after(0, self._try_connect)
 
     # ------------------------------------------------------------------
     # UI construction
@@ -164,11 +164,11 @@ class App(tk.Tk):
         state = self._source.read()
 
         if state is None:
-            self._set_status("Connection lost — retrying…", ok=False)
+            self._set_status("Connection lost - retrying...", ok=False)
             self.after(self.RETRY_MS, self._try_connect)
             return
 
-        new_violations = self._session.update(state, time.time())
+        new_violations = self._session.update(state, time.monotonic())
         for v in new_violations:
             self._append_violation(v)
 

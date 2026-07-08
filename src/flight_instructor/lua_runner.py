@@ -159,6 +159,10 @@ class LuaRunner:
         self._score_api.set_timestamp(timestamp)
 
     def _run_rules(self):
-        """Call every registered rule closure."""
+        """Call every registered rule closure, logging errors without stopping evaluation."""
+        import logging
         for rule_fn in self._rules:
-            rule_fn()
+            try:
+                rule_fn()
+            except Exception as exc:
+                logging.warning("Rule error: %s", exc)
