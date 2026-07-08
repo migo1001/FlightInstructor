@@ -126,15 +126,15 @@ class App(tk.Tk):
         frame = tk.Frame(self, bg=_BG_PANEL, padx=16, pady=6)
         frame.pack(fill=tk.X, side=tk.BOTTOM)
 
-        self._status_var = tk.StringVar(value="Searching for MSFS 2020…")
-        tk.Label(
+        self._status_var = tk.StringVar(value="Searching for MSFS 2020...")
+        self._status_label = tk.Label(
             frame,
             textvariable=self._status_var,
             fg=_FG_STATUS_ERR, bg=_BG_PANEL,
             font=tkfont.Font(family="Consolas", size=10),
             anchor="w",
-        ).pack(side=tk.LEFT)
-        self._status_label = self.nametowidget(frame.winfo_children()[-1].winfo_name())
+        )
+        self._status_label.pack(side=tk.LEFT)
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -147,19 +147,13 @@ class App(tk.Tk):
             self._set_status("Connected to MSFS 2020", ok=True)
             self.after(self.POLL_MS, self._poll)
         except Exception:
-            self._set_status("MSFS 2020 not found — retrying…", ok=False)
+            self._set_status("MSFS 2020 not found - retrying...", ok=False)
             self.after(self.RETRY_MS, self._try_connect)
 
     def _set_status(self, text, ok=True):
         """Update the status bar text and colour."""
-        self._status_var.set(f"{'●' if ok else '○'}  {text}")
-        colour = _FG_STATUS if ok else _FG_STATUS_ERR
-        # Walk to the label widget inside the bottom frame
-        for widget in self.winfo_children():
-            if isinstance(widget, tk.Frame) and widget.pack_info().get("side") == "bottom":
-                for child in widget.winfo_children():
-                    if isinstance(child, tk.Label):
-                        child.configure(fg=colour)
+        self._status_var.set(text)
+        self._status_label.configure(fg=_FG_STATUS if ok else _FG_STATUS_ERR)
 
     # ------------------------------------------------------------------
     # Poll loop
