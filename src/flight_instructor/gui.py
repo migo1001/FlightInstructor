@@ -146,8 +146,8 @@ class App(tk.Tk):
             self._source.connect()
             self._set_status("Connected to MSFS 2020", ok=True)
             self.after(self.POLL_MS, self._poll)
-        except Exception:
-            self._set_status("MSFS 2020 not found - retrying...", ok=False)
+        except Exception as exc:
+            self._set_status(str(exc), ok=False)
             self.after(self.RETRY_MS, self._try_connect)
 
     def _set_status(self, text, ok=True):

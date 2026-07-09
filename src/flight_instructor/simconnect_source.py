@@ -62,10 +62,20 @@ class SimConnectSource:
         """
         Attempt to connect to MSFS via SimConnect.
 
-        Raises RuntimeError if SimConnect or MSFS is not available.
+        Raises RuntimeError with a user-readable message distinguishing a
+        missing Python package from MSFS not running.
         """
-        from SimConnect import SimConnect, AircraftRequests
-        self._sm = SimConnect()
+        try:
+            from SimConnect import SimConnect, AircraftRequests
+        except ImportError:
+            raise RuntimeError(
+                "SimConnect package not installed. "
+                "Run: pip install SimConnect"
+            )
+        try:
+            self._sm = SimConnect()
+        except Exception as exc:
+            raise RuntimeError(f"MSFS not running or SimConnect failed: {exc}") from exc
         self._aq = AircraftRequests(self._sm, _time=self.POLL_INTERVAL_MS)
         self._connected = True
 

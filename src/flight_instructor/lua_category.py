@@ -26,12 +26,30 @@ class LuaCategory:
         """Swap in a new score card (called at the start of each evaluate())."""
         self._score_card = score_card
 
-    def malus(self, points, description):
-        """Record a violation against this category."""
+    def malus(self, points, description, severity_name=None):
+        """
+        Record a violation against this category.
+
+        severity_name — optional string: "minor", "moderate", "serious",
+                        "critical", or "fatal". Defaults to "moderate".
+        """
         self._score_card.add_violation(Violation(
             category=self._category,
             malus=int(points),
             description=str(description),
             timestamp=self._timestamp,
-            severity=Severity.MODERATE,
+            severity=self._parse_severity(severity_name),
         ))
+
+    def _parse_severity(self, name):
+        """Convert a severity name string to a Severity enum value."""
+        if name is None:
+            return Severity.MODERATE
+        mapping = {
+            "minor":    Severity.MINOR,
+            "moderate": Severity.MODERATE,
+            "serious":  Severity.SERIOUS,
+            "critical": Severity.CRITICAL,
+            "fatal":    Severity.FATAL,
+        }
+        return mapping.get(str(name).lower(), Severity.MODERATE)

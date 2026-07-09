@@ -172,3 +172,150 @@ class SimulatedTelemetry:
             throttle_pct=100.0,
             parking_brake=False,
         )
+
+    def cruising(self, altitude_agl_ft=5000.0):
+        """C172 in level cruise."""
+        return AircraftState(
+            on_ground=False,
+            on_runway=False,
+            engine_running=True,
+            engine_rpm=2200.0,
+            ground_speed_kt=105.0,
+            indicated_airspeed_kt=105.0,
+            altitude_agl_ft=altitude_agl_ft,
+            vertical_speed_fpm=0.0,
+            pitch_deg=1.0,
+            throttle_pct=75.0,
+            parking_brake=False,
+        )
+
+    def descending(self, altitude_agl_ft=3500.0, vertical_speed_fpm=-500.0):
+        """C172 in a power-off descent."""
+        return AircraftState(
+            on_ground=False,
+            on_runway=False,
+            engine_running=True,
+            engine_rpm=1800.0,
+            ground_speed_kt=90.0,
+            indicated_airspeed_kt=90.0,
+            altitude_agl_ft=altitude_agl_ft,
+            vertical_speed_fpm=vertical_speed_fpm,
+            pitch_deg=-2.0,
+            throttle_pct=20.0,
+            parking_brake=False,
+        )
+
+    def on_approach(self, altitude_agl_ft=1500.0, vertical_speed_fpm=-500.0):
+        """C172 established on approach, gear down, slowing."""
+        return AircraftState(
+            on_ground=False,
+            on_runway=False,
+            engine_running=True,
+            engine_rpm=1600.0,
+            ground_speed_kt=70.0,
+            indicated_airspeed_kt=70.0,
+            altitude_agl_ft=altitude_agl_ft,
+            vertical_speed_fpm=vertical_speed_fpm,
+            pitch_deg=0.0,
+            flaps_deg=20.0,
+            throttle_pct=15.0,
+            parking_brake=False,
+            landing_light_on=True,
+        )
+
+    def on_final(self, altitude_agl_ft=300.0, vertical_speed_fpm=-500.0):
+        """C172 on short final, full flaps."""
+        return AircraftState(
+            on_ground=False,
+            on_runway=False,
+            engine_running=True,
+            engine_rpm=1400.0,
+            ground_speed_kt=60.0,
+            indicated_airspeed_kt=60.0,
+            altitude_agl_ft=altitude_agl_ft,
+            vertical_speed_fpm=vertical_speed_fpm,
+            pitch_deg=1.0,
+            flaps_deg=30.0,
+            throttle_pct=10.0,
+            parking_brake=False,
+            landing_light_on=True,
+        )
+
+    def touchdown(self, ground_speed_kt=55.0):
+        """C172 just after touchdown, high speed on runway."""
+        return AircraftState(
+            on_ground=True,
+            on_runway=True,
+            engine_running=True,
+            engine_rpm=1200.0,
+            ground_speed_kt=ground_speed_kt,
+            indicated_airspeed_kt=ground_speed_kt,
+            altitude_agl_ft=0.0,
+            vertical_speed_fpm=0.0,
+            flaps_deg=30.0,
+            throttle_pct=0.0,
+            parking_brake=False,
+            landing_light_on=True,
+        )
+
+    def rollout(self, ground_speed_kt=30.0):
+        """C172 decelerating on the runway after landing."""
+        return AircraftState(
+            on_ground=True,
+            on_runway=True,
+            engine_running=True,
+            engine_rpm=800.0,
+            ground_speed_kt=ground_speed_kt,
+            indicated_airspeed_kt=ground_speed_kt,
+            altitude_agl_ft=0.0,
+            vertical_speed_fpm=0.0,
+            flaps_deg=30.0,
+            throttle_pct=0.0,
+            parking_brake=False,
+        )
+
+    def taxi_in(self, ground_speed_kt=8.0):
+        """C172 taxiing back after landing."""
+        return AircraftState(
+            on_ground=True,
+            on_runway=False,
+            engine_running=True,
+            engine_rpm=900.0,
+            ground_speed_kt=ground_speed_kt,
+            indicated_airspeed_kt=0.0,
+            altitude_agl_ft=0.0,
+            vertical_speed_fpm=0.0,
+            throttle_pct=10.0,
+            parking_brake=False,
+            taxi_light_on=True,
+        )
+
+    def parked(self):
+        """C172 stopped at the ramp, engine still running."""
+        return AircraftState(
+            on_ground=True,
+            on_runway=False,
+            engine_running=True,
+            engine_rpm=750.0,
+            ground_speed_kt=0.0,
+            indicated_airspeed_kt=0.0,
+            altitude_agl_ft=0.0,
+            vertical_speed_fpm=0.0,
+            throttle_pct=5.0,
+            parking_brake=True,
+        )
+
+    def engine_shutdown(self):
+        """C172 with engine stopped after shutdown checklist."""
+        return AircraftState(
+            on_ground=True,
+            on_runway=False,
+            engine_running=False,
+            engine_rpm=0.0,
+            ground_speed_kt=0.0,
+            indicated_airspeed_kt=0.0,
+            altitude_agl_ft=0.0,
+            vertical_speed_fpm=0.0,
+            throttle_pct=0.0,
+            parking_brake=True,
+        )

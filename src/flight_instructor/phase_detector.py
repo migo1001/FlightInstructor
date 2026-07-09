@@ -30,6 +30,21 @@ class PhaseDetector:
     INITIAL_CLIMB_SECONDS = 2.0
     CRUISE_AGL_FT = 1000.0
     CRUISE_ENTRY_SECONDS = 3.0
+    LEVEL_OFF_VS_FPM = 200.0
+    LEVEL_OFF_SECONDS = 5.0
+    DESCENT_VS_FPM = -300.0
+    DESCENT_ENTRY_SECONDS = 5.0
+    APPROACH_AGL_FT = 2000.0
+    APPROACH_ENTRY_SECONDS = 3.0
+    FINAL_AGL_FT = 500.0
+    FINAL_ENTRY_SECONDS = 2.0
+    TOUCHDOWN_SECONDS = 0.5
+    ROLLOUT_IAS_KT = 60.0
+    ROLLOUT_ENTRY_SECONDS = 1.0
+    TAXI_IN_ENTRY_SECONDS = 2.0
+    PARKING_SPEED_KT = 1.0
+    PARKING_ENTRY_SECONDS = 3.0
+    SHUTDOWN_SECONDS = 2.0
 
     def __init__(self):
         """Initialize with the aircraft assumed to be cold and dark."""
@@ -47,6 +62,15 @@ class PhaseDetector:
             Phase.TAKEOFF_ROLL: self._from_takeoff_roll,
             Phase.ROTATION: self._from_rotation,
             Phase.INITIAL_CLIMB: self._from_initial_climb,
+            Phase.CLIMB: self._from_climb,
+            Phase.CRUISE: self._from_cruise,
+            Phase.DESCENT: self._from_descent,
+            Phase.APPROACH: self._from_approach,
+            Phase.FINAL: self._from_final,
+            Phase.LANDING: self._from_landing,
+            Phase.ROLLOUT: self._from_rollout,
+            Phase.TAXI_IN: self._from_taxi_in,
+            Phase.PARKING: self._from_parking,
         }
         handler = handlers.get(self.phase)
         if handler:
@@ -142,6 +166,104 @@ class PhaseDetector:
             state.altitude_agl_ft > self.CRUISE_AGL_FT,
             Phase.CLIMB,
             self.CRUISE_ENTRY_SECONDS,
+            timestamp,
+        )
+
+    def _from_climb(self, state, timestamp):
+        """Climb: level off → CRUISE; or descend directly → DESCENT."""
+        if self._transition_if_held(
+            "climb_to_descent",
+            not state.on_ground and state.vertical_speed_fpm < self.DESCENT_VS_FPM,
+            Phase.DESCENT,
+            self.DESCENT_ENTRY_SECONDS,
+            timestamp,
+        ):
+            return
+        self._transition_if_held(
+            "level_off",
+            not state.on_ground and abs(state.vertical_speed_fpm) < self.LEVEL_OFF_VS_FPM,
+            Phase.CRUISE,
+            self.LEVEL_OFF_SECONDS,
+            timestamp,
+        )
+
+    def _from_cruise(self, state, timestamp):
+        """Cruise: sustained descent → DESCENT."""
+        self._transition_if_held(
+            "cruise_to_descent",
+            not state.on_ground and state.vertical_speed_fpm < self.DESCENT_VS_FPM,
+            Phase.DESCENT,
+            self.DESCENT_ENTRY_SECONDS,
+            timestamp,
+        )
+
+    def _from_descent(self, state, timestamp):
+        """Descent: below approach altitude → APPROACH."""
+        self._transition_if_held(
+            "descent_to_approach",
+            not state.on_ground and state.altitude_agl_ft < self.APPROACH_AGL_FT,
+            Phase.APPROACH,
+            self.APPROACH_ENTRY_SECONDS,
+            timestamp,
+        )
+
+    def _from_approach(self, state, timestamp):
+        """Approach: below final altitude → FINAL."""
+        self._transition_if_held(
+            "approach_to_final",
+            not state.on_ground and state.altitude_agl_ft < self.FINAL_AGL_FT,
+            Phase.FINAL,
+            self.FINAL_ENTRY_SECONDS,
+            timestamp,
+        )
+
+    def _from_final(self, state, timestamp):
+        """Final: on ground → LANDING (touchdown)."""
+        self._transition_if_held(
+            "touchdown",
+            state.on_ground,
+            Phase.LANDING,
+            self.TOUCHDOWN_SECONDS,
+            timestamp,
+        )
+
+    def _from_landing(self, state, timestamp):
+        """Landing roll: IAS drops below rotation speed → ROLLOUT."""
+        self._transition_if_held(
+            "landing_to_rollout",
+            state.on_ground and state.indicated_airspeed_kt < self.ROLLOUT_IAS_KT,
+            Phase.ROLLOUT,
+            self.ROLLOUT_ENTRY_SECONDS,
+            timestamp,
+        )
+
+    def _from_rollout(self, state, timestamp):
+        """Rollout: ground speed drops to taxi speed → TAXI_IN."""
+        self._transition_if_held(
+            "rollout_to_taxi_in",
+            state.on_ground and state.ground_speed_kt < self.TAXI_SPEED_KT,
+            Phase.TAXI_IN,
+            self.TAXI_IN_ENTRY_SECONDS,
+            timestamp,
+        )
+
+    def _from_taxi_in(self, state, timestamp):
+        """Taxi in: essentially stopped → PARKING."""
+        self._transition_if_held(
+            "taxi_in_to_parking",
+            state.on_ground and state.ground_speed_kt < self.PARKING_SPEED_KT,
+            Phase.PARKING,
+            self.PARKING_ENTRY_SECONDS,
+            timestamp,
+        )
+
+    def _from_parking(self, state, timestamp):
+        """Parking: engine stops → SHUTDOWN."""
+        self._transition_if_held(
+            "parking_to_shutdown",
+            not state.engine_running,
+            Phase.SHUTDOWN,
+            self.SHUTDOWN_SECONDS,
             timestamp,
         )
 

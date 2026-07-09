@@ -78,3 +78,61 @@ Artifacts created
 - A temporary wheel was built under `/tmp/flight-instructor-wheel` for package
   inspection.
 - This report file: `gpt-report.txt`.
+
+Recommendations
+1. Finish the flight phase lifecycle before adding many more rules.
+   The current phase detector covers startup through climb. Add conservative,
+   well-tested transitions for cruise, descent, approach, final, landing,
+   rollout, taxi-in, parking, shutdown, and secured. Rule quality depends on
+   phase accuracy, so phase coverage is more important than expanding the rule
+   catalog right now.
+
+2. Treat runway detection as the main live-sim correctness problem.
+   `on_runway = on_ground` is acceptable as a temporary stub, but it can create
+   false lineup and takeoff events. Prefer a runway confidence model rather than
+   a boolean if possible: unknown, probable runway, confirmed runway. Rules that
+   can create penalties should require confirmed or high-confidence context.
+
+3. Add a telemetry validation harness for real MSFS sessions.
+   Before tuning rules, log raw SimConnect values alongside normalized
+   AircraftState fields during a few real C172 flights. Verify units and ranges
+   for mixture, carb heat, trim, flaps, fuel selector, pitch, bank, and heading.
+   Keep captured logs as fixtures for regression tests where licensing/privacy
+   permits.
+
+4. Improve runtime diagnostics in the GUI.
+   Missing SimConnect, missing MSFS, missing rules, and Lua rule errors should
+   not all look like a generic retry state. Surface concise status messages and
+   write detailed logs to a file so user reports are actionable.
+
+5. Let Lua rules specify severity and possibly confidence.
+   `category.malus()` currently hardcodes `Severity.MODERATE`. Add an API such
+   as `safety.malus(points, description, severity)` or named helpers like
+   `safety.minor(...)`, `safety.serious(...)`, and `safety.critical(...)`.
+   This will make debriefs and score caps align better with the design goals.
+
+6. Keep rule enforcement conservative.
+   For ambiguous procedures, prefer notes or warnings over score deductions.
+   In particular, avoid penalizing anything tied to uncertain runway detection,
+   aircraft-specific optional SOPs, or unverified SimConnect values until the
+   telemetry evidence is strong.
+
+7. Add integration tests around packaged artifacts.
+   Build a wheel in CI and assert that `flight_instructor/rules/global.lua` and
+   `flight_instructor/rules/c172.lua` are present. Also add a smoke test for
+   `Session(_rules_dir())` so packaging regressions are caught before release.
+
+8. Separate environment problems from application problems.
+   Since SimConnect is Windows-only and intentionally not declared as a normal
+   dependency, document the Windows install path and add a startup check that
+   clearly reports when the Python SimConnect package is unavailable.
+
+9. Grow tests with behavior, not implementation.
+   The current test suite is useful. Continue adding scenario-style tests using
+   simulated telemetry for each new phase transition and each new Lua rule. Add
+   a small number of regression tests from real telemetry logs once available.
+
+10. Avoid broad refactors for now.
+    The code is readable and modular enough. The next quality improvements
+    should be targeted: phase coverage, telemetry confidence, diagnostics,
+    severity support, and packaging/runtime smoke tests.

@@ -245,3 +245,58 @@ class TestCombinedEvents:
         detector.update(s.taxiing(), Phase.TAXI_OUT, 10.0)
         assert _has_event(detector.events, EventType.TAXI_STARTED)
         assert _has_event(detector.events, EventType.PARKING_BRAKE_RELEASED)
+
+
+# ---------------------------------------------------------------------------
+# Descent, approach, and landing events
+# ---------------------------------------------------------------------------
+
+class TestDescentEvents:
+    def test_descent_started_fires_from_climb(self):
+        """Direct climb-to-descent transition must emit DESCENT_STARTED."""
+        detector = EventDetector()
+        s = SimulatedTelemetry()
+        detector.update(s.climbing(), Phase.CLIMB, 0.0)
+        detector.update(s.descending(), Phase.DESCENT, 300.0)
+        assert _has_event(detector.events, EventType.DESCENT_STARTED)
+
+    def test_descent_started_fires_from_cruise(self):
+        """Cruise-to-descent transition must also emit DESCENT_STARTED."""
+        detector = EventDetector()
+        s = SimulatedTelemetry()
+        detector.update(s.cruising(), Phase.CRUISE, 0.0)
+        detector.update(s.descending(), Phase.DESCENT, 300.0)
+        assert _has_event(detector.events, EventType.DESCENT_STARTED)
+
+    def test_descent_started_fires_only_once(self):
+        """DESCENT_STARTED must not repeat on subsequent frames in DESCENT."""
+        detector = EventDetector()
+        s = SimulatedTelemetry()
+        detector.update(s.cruising(), Phase.CRUISE, 0.0)
+        detector.update(s.descending(), Phase.DESCENT, 300.0)
+        assert _has_event(detector.events, EventType.DESCENT_STARTED)
+        detector.update(s.descending(), Phase.DESCENT, 300.2)
+        assert not _has_event(detector.events, EventType.DESCENT_STARTED)
+
+
+class TestApproachAndLandingEvents:
+    def test_approach_started_fires_on_approach_entry(self):
+        detector = EventDetector()
+        s = SimulatedTelemetry()
+        detector.update(s.descending(), Phase.DESCENT, 0.0)
+        detector.update(s.on_approach(), Phase.APPROACH, 120.0)
+        assert _has_event(detector.events, EventType.APPROACH_STARTED)
+
+    def test_touchdown_fires_on_landing_entry(self):
+        detector = EventDetector()
+        s = SimulatedTelemetry()
+        detector.update(s.on_final(), Phase.FINAL, 0.0)
+        detector.update(s.touchdown(), Phase.LANDING, 60.0)
+        assert _has_event(detector.events, EventType.TOUCHDOWN)
+
+    def test_taxi_in_started_fires_on_taxi_in_entry(self):
+        detector = EventDetector()
+        s = SimulatedTelemetry()
+        detector.update(s.rollout(), Phase.ROLLOUT, 0.0)
+        detector.update(s.taxi_in(), Phase.TAXI_IN, 30.0)
+        assert _has_event(detector.events, EventType.TAXI_IN_STARTED)

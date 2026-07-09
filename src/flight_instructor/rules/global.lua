@@ -7,7 +7,7 @@ local _stall_active = false
 register(function()
     if stall_warning and not _stall_active then
         _stall_active = true
-        safety.malus(15, "Stall warning active.")
+        safety.malus(15, "Stall warning active.", "critical")
     elseif not stall_warning then
         _stall_active = false
     end
@@ -25,7 +25,7 @@ register(function()
     if bank < 0 then bank = -bank end
     if bank > BANK_LIMIT and not _bank_active then
         _bank_active = true
-        aircraft_handling.malus(10, string.format("Excessive bank angle: %.0f deg (limit %d deg).", bank, BANK_LIMIT))
+        aircraft_handling.malus(10, string.format("Excessive bank angle: %.0f deg (limit %d deg).", bank, BANK_LIMIT), "serious")
     elseif bank <= BANK_LIMIT then
         _bank_active = false
     end
@@ -41,7 +41,7 @@ register(function()
     end
     if position.vertical_speed_fpm < SINK_LIMIT_FPM and not _sink_active then
         _sink_active = true
-        aircraft_handling.malus(10, string.format("Excessive sink rate: %.0f fpm (limit %d fpm).", position.vertical_speed_fpm, SINK_LIMIT_FPM))
+        aircraft_handling.malus(10, string.format("Excessive sink rate: %.0f fpm (limit %d fpm).", position.vertical_speed_fpm, SINK_LIMIT_FPM), "serious")
     elseif position.vertical_speed_fpm >= SINK_LIMIT_FPM then
         _sink_active = false
     end

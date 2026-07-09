@@ -27,7 +27,7 @@ end)
 register(function()
     if not has_event("TAKEOFF_ROLL_STARTED") then return end
     if not controls.fuel_selector_both then
-        safety.malus(10, "Takeoff roll started with fuel selector not set to BOTH.")
+        safety.malus(10, "Takeoff roll started with fuel selector not set to BOTH.", "serious")
     end
 end)
 
@@ -49,7 +49,7 @@ register(function()
     end
     if not lights.taxi and not _taxi_light_off_active then
         _taxi_light_off_active = true
-        procedures.malus(3, "Taxi light off while taxiing.")
+        procedures.malus(3, "Taxi light off while taxiing.", "minor")
     elseif lights.taxi then
         _taxi_light_off_active = false
     end

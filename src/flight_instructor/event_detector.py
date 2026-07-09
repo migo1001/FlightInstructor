@@ -25,6 +25,11 @@ class EventDetector:
         (Phase.TAKEOFF_ROLL, Phase.ROTATION): EventType.LIFTOFF,
         (Phase.ROTATION, Phase.INITIAL_CLIMB): EventType.CLIMB_STARTED,
         (Phase.INITIAL_CLIMB, Phase.CLIMB): EventType.CRUISE_STARTED,
+        (Phase.CLIMB, Phase.DESCENT): EventType.DESCENT_STARTED,
+        (Phase.CRUISE, Phase.DESCENT): EventType.DESCENT_STARTED,
+        (Phase.DESCENT, Phase.APPROACH): EventType.APPROACH_STARTED,
+        (Phase.FINAL, Phase.LANDING): EventType.TOUCHDOWN,
+        (Phase.ROLLOUT, Phase.TAXI_IN): EventType.TAXI_IN_STARTED,
     }
 
     # Each entry: (field_name, rising_edge_event, falling_edge_event).
