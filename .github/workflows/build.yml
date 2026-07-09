@@ -31,7 +31,7 @@ jobs:
             --onefile \
             --windowed \
             --name FlightInstructor \
-            --add-data "rules;rules" \
+            --collect-data flight_instructor \
             --collect-all lupa \
             --hidden-import tkinter.scrolledtext \
             --hidden-import tkinter.font \

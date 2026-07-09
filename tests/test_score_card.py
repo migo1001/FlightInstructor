@@ -167,11 +167,12 @@ class TestActiveCaps:
         # raw = 50, cap = 65 → cap not active
         assert cap not in card.active_caps()
 
-    def test_no_active_caps_when_score_card_is_clean(self):
+    def test_cap_is_active_when_it_limits_a_clean_score(self):
         card = ScoreCard()
-        card.add_cap(_cap(max_score=65))
-        # raw = 100, no violations but cap IS active (65 < 100)
-        assert _cap(max_score=65) not in card.active_caps()
+        cap = _cap(max_score=65)
+        card.add_cap(cap)
+        # raw = 100, cap at 65 < 100 — cap is limiting even with no violations
+        assert cap in card.active_caps()
 
     def test_active_caps_returns_cap_objects_not_scores(self):
         card = ScoreCard()

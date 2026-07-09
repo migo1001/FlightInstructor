@@ -1,0 +1,80 @@
+GPT Report - 2026-07-09
+
+Scope
+Read the FlightInstructor project, ran the available tests, inspected packaging
+and runtime integration points, and reviewed the code for likely bugs or
+incorrect assumptions.
+
+What I did
+- Listed the repository contents and confirmed the worktree started clean.
+- Reviewed project metadata in pyproject.toml.
+- Read the core Python modules:
+  - aircraft_state.py
+  - phase_detector.py
+  - event_detector.py
+  - score_card.py
+  - lua_runner.py
+  - lua_score_api.py
+  - lua_category.py
+  - session.py
+  - simconnect_source.py
+  - gui.py
+  - __main__.py
+- Read the Lua rule files:
+  - rules/global.lua
+  - rules/c172.lua
+- Read the pytest suites and simulated telemetry helpers.
+- Ran tests in the system interpreter and then in an isolated project venv.
+- Built and inspected a wheel to verify what files are included in a packaged
+  artifact.
+
+Test results
+- `pytest -q` failed initially because the package uses a src layout and was not
+  installed in the active interpreter:
+  `ModuleNotFoundError: No module named 'flight_instructor'`.
+- `env PYTHONPATH=src pytest -q tests/test_score_card.py tests/test_phase_detector.py tests/test_event_detector.py`
+  passed:
+  `78 passed`.
+- `env PYTHONPATH=src pytest -q` then failed because `lupa` was not installed.
+- Created a local `.venv`.
+- Installed the project with dev dependencies into `.venv`.
+- `.venv/bin/python -m pytest -q` passed:
+  `148 passed`.
+
+Findings
+1. Packaged app will not find Lua rules.
+   `pyproject.toml` only packages Python modules under `src`; the `rules/*.lua`
+   files are outside the package and are absent from the built wheel. The entry
+   point resolves rules by walking up to the source checkout root, which works in
+   development but not in a normal wheel install.
+
+2. SimConnect is used but not declared as a dependency.
+   `SimConnectSource.connect()` imports `SimConnect`, but `pyproject.toml`
+   declares only `lupa`. The GUI catches all connection exceptions, so a missing
+   Python dependency can appear to the user as "MSFS not found - retrying..."
+   forever.
+
+3. Real telemetry treats every ground location as a runway.
+   `SimConnectSource._build_state()` sets `on_runway` equal to `on_ground`.
+   This can make ordinary taxi positions look like runway positions to the phase
+   detector, causing false LINEUP or TAKEOFF_ROLL transitions and false
+   event-triggered Lua penalties.
+
+4. Flight phase detection stops after climb.
+   `PhaseDetector` has handlers through `INITIAL_CLIMB -> CLIMB`, but no
+   handlers for cruise, descent, approach, final, landing, rollout, taxi-in,
+   parking, shutdown, or secured phases. The enum and event types name these
+   phases/events, but they are not currently reachable.
+
+5. One score-card test is misleading.
+   `test_no_active_caps_when_score_card_is_clean` says no active caps should
+   exist on a clean card, but its comment says the cap is active. The test passes
+   because it checks membership with a newly-created `ScoreCap` object rather
+   than the object that was added to the card.
+
+Artifacts created
+- `.venv/` was created locally for dependency installation and full test
+  execution.
+- A temporary wheel was built under `/tmp/flight-instructor-wheel` for package
+  inspection.
+- This report file: `gpt-report.txt`.

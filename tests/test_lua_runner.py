@@ -5,6 +5,8 @@ Each test group targets one concern: state exposure, scoring API,
 global rules, and C172-specific rules.
 """
 
+from pathlib import Path
+
 import pytest
 from flight_instructor.aircraft_state import AircraftState
 from flight_instructor.event_type import EventType
@@ -315,8 +317,11 @@ class TestRisingEdge:
 # 6. Global rules file
 # ---------------------------------------------------------------------------
 
+_RULES_DIR = Path(__file__).resolve().parent.parent / "src" / "flight_instructor" / "rules"
+
+
 class TestGlobalRules:
-    RULES_PATH = "rules/global.lua"
+    RULES_PATH = _RULES_DIR / "global.lua"
 
     def _runner(self):
         runner = LuaRunner()
@@ -428,7 +433,7 @@ def _good_takeoff_state(**overrides):
 
 
 class TestC172Rules:
-    RULES_PATH = "rules/c172.lua"
+    RULES_PATH = _RULES_DIR / "c172.lua"
 
     def _runner(self):
         runner = LuaRunner()

@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 from flight_instructor.gui import App
@@ -10,13 +9,11 @@ def _rules_dir():
     """
     Resolve the path to the rules/ directory.
 
-    When packaged with PyInstaller (--onefile), the executable extracts to a
-    temporary directory exposed via sys._MEIPASS.  In development the rules/
-    directory lives at the project root, three levels above this file.
+    The rules live inside the package (flight_instructor/rules/), so they are
+    found correctly whether running from source, a wheel install, or a
+    PyInstaller bundle.
     """
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS) / "rules"
-    return Path(__file__).resolve().parent.parent.parent / "rules"
+    return Path(__file__).resolve().parent / "rules"
 
 
 def main():

@@ -18,5 +18,8 @@ build = ["pyinstaller>=6.0"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+flight_instructor = ["rules/*.lua"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
