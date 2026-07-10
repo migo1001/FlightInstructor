@@ -22,13 +22,14 @@ _CATEGORY_LABELS = {
     ScoreCategory.NAVIGATION:       "NAVIGATION",
 }
 
-_BG          = "#1A1A2E"
-_BG_PANEL    = "#16213E"
-_FG_DIM      = "#6B7280"
-_FG_PHASE    = "#93C5FD"
-_FG_SCORE    = "#F9FAFB"
-_FG_STATUS   = "#6EE7B7"
+_BG            = "#1A1A2E"
+_BG_PANEL      = "#16213E"
+_FG_DIM        = "#6B7280"
+_FG_PHASE      = "#93C5FD"
+_FG_SCORE      = "#F9FAFB"
+_FG_STATUS     = "#6EE7B7"
 _FG_STATUS_ERR = "#FCA5A5"
+_FG_CONN_LOG   = "#4B5563"
 
 
 class App(tk.Tk):
@@ -53,8 +54,10 @@ class App(tk.Tk):
         source  — SimConnectSource instance (not yet connected)
         """
         super().__init__()
-        self._session = session
-        self._source  = source
+        self._session       = session
+        self._source        = source
+        self._retry_count   = 0
+        self._connected     = False
 
         self.title(self.WINDOW_TITLE)
         self.geometry(self.WINDOW_SIZE)
@@ -75,13 +78,14 @@ class App(tk.Tk):
         self._build_status()
 
     def _build_header(self):
-        """Top bar: phase on the left, score on the right."""
+        """Top bar: phase on the left, connection dot + score on the right."""
         frame = tk.Frame(self, bg=_BG_PANEL, padx=16, pady=10)
         frame.pack(fill=tk.X, side=tk.TOP)
 
-        mono = tkfont.Font(family="Consolas", size=13)
+        mono      = tkfont.Font(family="Consolas", size=13)
+        mono_bold = tkfont.Font(family="Consolas", size=13, weight="bold")
 
-        self._phase_var = tk.StringVar(value="Phase: —")
+        self._phase_var = tk.StringVar(value="Phase: -")
         tk.Label(
             frame,
             textvariable=self._phase_var,
@@ -94,12 +98,20 @@ class App(tk.Tk):
             frame,
             textvariable=self._score_var,
             fg=_FG_SCORE, bg=_BG_PANEL,
-            font=tkfont.Font(family="Consolas", size=13, weight="bold"),
-            anchor="e",
+            font=mono_bold, anchor="e",
         ).pack(side=tk.RIGHT)
 
+        # Coloured dot: green = connected, red = disconnected
+        self._conn_dot = tk.Label(
+            frame,
+            text="  MSFS",
+            fg=_FG_STATUS_ERR, bg=_BG_PANEL,
+            font=mono, anchor="e",
+        )
+        self._conn_dot.pack(side=tk.RIGHT, padx=(0, 16))
+
     def _build_log(self):
-        """Scrolling violation log in the middle."""
+        """Scrolling log in the middle — violations and connection events."""
         frame = tk.Frame(self, bg=_BG)
         frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
 
@@ -114,15 +126,17 @@ class App(tk.Tk):
         )
         self._log.pack(fill=tk.BOTH, expand=True)
 
-        # Register a tag per category for coloured category labels
         for category, colour in _CATEGORY_COLORS.items():
             self._log.tag_config(category.name, foreground=colour)
-        self._log.tag_config("time",  foreground=_FG_DIM)
-        self._log.tag_config("malus", foreground="#F87171")
-        self._log.tag_config("desc",  foreground=_FG_SCORE)
+        self._log.tag_config("time",    foreground=_FG_DIM)
+        self._log.tag_config("malus",   foreground="#F87171")
+        self._log.tag_config("desc",    foreground=_FG_SCORE)
+        self._log.tag_config("conn_ok", foreground=_FG_STATUS)
+        self._log.tag_config("conn_err",foreground=_FG_STATUS_ERR)
+        self._log.tag_config("conn_dim",foreground=_FG_CONN_LOG)
 
     def _build_status(self):
-        """Bottom status bar."""
+        """Bottom status bar — last connection message."""
         frame = tk.Frame(self, bg=_BG_PANEL, padx=16, pady=6)
         frame.pack(fill=tk.X, side=tk.BOTTOM)
 
@@ -142,18 +156,26 @@ class App(tk.Tk):
 
     def _try_connect(self):
         """Attempt SimConnect connection; schedule retry on failure."""
+        self._retry_count += 1
+        self._append_conn(f"[Attempt {self._retry_count}] Connecting to MSFS 2020...", "conn_dim")
         try:
             self._source.connect()
-            self._set_status("Connected to MSFS 2020", ok=True)
+            self._set_connected(True)
+            self._append_conn("[OK] Connected to MSFS 2020.", "conn_ok")
             self.after(self.POLL_MS, self._poll)
         except Exception as exc:
-            self._set_status(str(exc), ok=False)
+            self._set_connected(False)
+            self._append_conn(f"[FAIL] {exc}", "conn_err")
             self.after(self.RETRY_MS, self._try_connect)
 
-    def _set_status(self, text, ok=True):
-        """Update the status bar text and colour."""
+    def _set_connected(self, ok):
+        """Update connection dot colour and status bar."""
+        self._connected = ok
+        colour = _FG_STATUS if ok else _FG_STATUS_ERR
+        self._conn_dot.configure(fg=colour)
+        text   = "Connected to MSFS 2020" if ok else "Not connected - retrying every 3 s"
         self._status_var.set(text)
-        self._status_label.configure(fg=_FG_STATUS if ok else _FG_STATUS_ERR)
+        self._status_label.configure(fg=colour)
 
     # ------------------------------------------------------------------
     # Poll loop
@@ -164,7 +186,8 @@ class App(tk.Tk):
         state = self._source.read()
 
         if state is None:
-            self._set_status("Connection lost - retrying...", ok=False)
+            self._set_connected(False)
+            self._append_conn("[FAIL] Connection lost.", "conn_err")
             self.after(self.RETRY_MS, self._try_connect)
             return
 
@@ -183,22 +206,25 @@ class App(tk.Tk):
         """Refresh phase label and score."""
         phase_name = self._session.phase.value.replace("_", " ").title()
         self._phase_var.set(f"Phase: {phase_name}")
+        self._score_var.set(f"Score: {self._session.score}")
 
-        score = self._session.score
-        self._score_var.set(f"Score: {score}")
+    def _append_conn(self, message, tag):
+        """Append a connection status line to the log."""
+        self._log.configure(state=tk.NORMAL)
+        self._log.insert(tk.END, f"{message}\n", tag)
+        self._log.configure(state=tk.DISABLED)
+        self._log.see(tk.END)
 
     def _append_violation(self, violation):
         """Append one violation to the scrolling log with per-category colour."""
-        session_time = violation.timestamp
+        session_time  = violation.timestamp
         category_label = _CATEGORY_LABELS.get(violation.category, violation.category.name)
-        colour_tag = violation.category.name
+        colour_tag    = violation.category.name
 
         self._log.configure(state=tk.NORMAL)
-
         self._log.insert(tk.END, f"[{session_time:7.1f}s]  ", "time")
         self._log.insert(tk.END, f"{category_label:<12}", colour_tag)
         self._log.insert(tk.END, f"  -{violation.malus:<3}  ", "malus")
         self._log.insert(tk.END, f"{violation.description}\n", "desc")
-
         self._log.configure(state=tk.DISABLED)
         self._log.see(tk.END)
