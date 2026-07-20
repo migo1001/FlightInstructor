@@ -33,6 +33,7 @@ jobs:
             --name FlightInstructor \
             --collect-data flight_instructor \
             --collect-all lupa \
+            --collect-all SimConnect \
             --hidden-import tkinter.scrolledtext \
             --hidden-import tkinter.font \
             src/flight_instructor/__main__.py

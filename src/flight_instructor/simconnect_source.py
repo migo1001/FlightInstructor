@@ -74,10 +74,17 @@ class SimConnectSource:
             )
         try:
             self._sm = SimConnect()
+            self._aq = AircraftRequests(self._sm, _time=self.POLL_INTERVAL_MS)
+            self._connected = True
         except Exception as exc:
+            self.disconnect()
+            msg = str(exc)
+            if "SimConnect.dll" in msg or "DLL" in msg.upper():
+                raise RuntimeError(
+                    "SimConnect.dll not found. "
+                    "Make sure MSFS 2020 is installed and has been run at least once."
+                ) from exc
             raise RuntimeError(f"MSFS not running or SimConnect failed: {exc}") from exc
-        self._aq = AircraftRequests(self._sm, _time=self.POLL_INTERVAL_MS)
-        self._connected = True
 
     def disconnect(self):
         """Close the SimConnect connection."""

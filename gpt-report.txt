@@ -1,138 +1,156 @@
-GPT Report - 2026-07-09
+GPT Report - Updated 2026-07-09
 
 Scope
-Read the FlightInstructor project, ran the available tests, inspected packaging
-and runtime integration points, and reviewed the code for likely bugs or
-incorrect assumptions.
+Read the FlightInstructor project, ran the tests, reviewed the code for bugs
+and design risks, then reread `claude-report.txt` and inspected Claude's latest
+commit:
 
-What I did
-- Listed the repository contents and confirmed the worktree started clean.
-- Reviewed project metadata in pyproject.toml.
-- Read the core Python modules:
-  - aircraft_state.py
-  - phase_detector.py
-  - event_detector.py
-  - score_card.py
-  - lua_runner.py
-  - lua_score_api.py
-  - lua_category.py
-  - session.py
-  - simconnect_source.py
-  - gui.py
-  - __main__.py
-- Read the Lua rule files:
-  - rules/global.lua
-  - rules/c172.lua
-- Read the pytest suites and simulated telemetry helpers.
-- Ran tests in the system interpreter and then in an isolated project venv.
-- Built and inspected a wheel to verify what files are included in a packaged
-  artifact.
+  c0412ae Implement GPT report recommendations: full flight lifecycle + severity support
 
-Test results
-- `pytest -q` failed initially because the package uses a src layout and was not
-  installed in the active interpreter:
-  `ModuleNotFoundError: No module named 'flight_instructor'`.
-- `env PYTHONPATH=src pytest -q tests/test_score_card.py tests/test_phase_detector.py tests/test_event_detector.py`
-  passed:
-  `78 passed`.
-- `env PYTHONPATH=src pytest -q` then failed because `lupa` was not installed.
-- Created a local `.venv`.
-- Installed the project with dev dependencies into `.venv`.
-- `.venv/bin/python -m pytest -q` passed:
-  `148 passed`.
+This report reflects the current repository state after that commit.
 
-Findings
-1. Packaged app will not find Lua rules.
-   `pyproject.toml` only packages Python modules under `src`; the `rules/*.lua`
-   files are outside the package and are absent from the built wheel. The entry
-   point resolves rules by walking up to the source checkout root, which works in
-   development but not in a normal wheel install.
+Current Verification
+- Worktree status: only `claude-report.txt` is untracked.
+- Current full test suite:
+  `.venv/bin/python -m pytest -q`
+  Result: `177 passed in 0.23s`.
+- Latest commit inspected with `git show --stat` and file review.
+- Current package metadata confirms Lua rule files are package data:
+  `flight_instructor = ["rules/*.lua"]`.
+- Current rule path resolution uses the package-local
+  `src/flight_instructor/rules/` directory.
 
-2. SimConnect is used but not declared as a dependency.
-   `SimConnectSource.connect()` imports `SimConnect`, but `pyproject.toml`
-   declares only `lupa`. The GUI catches all connection exceptions, so a missing
-   Python dependency can appear to the user as "MSFS not found - retrying..."
-   forever.
+What Changed Since My Original Review
+Claude's latest work addressed several earlier findings and recommendations:
 
-3. Real telemetry treats every ground location as a runway.
-   `SimConnectSource._build_state()` sets `on_runway` equal to `on_ground`.
-   This can make ordinary taxi positions look like runway positions to the phase
-   detector, causing false LINEUP or TAKEOFF_ROLL transitions and false
-   event-triggered Lua penalties.
+1. Lua rules are now packaged.
+   The rule files moved from the project-root `rules/` directory into
+   `src/flight_instructor/rules/`, and `pyproject.toml` declares them as package
+   data. This resolves the original wheel/install packaging issue.
 
-4. Flight phase detection stops after climb.
-   `PhaseDetector` has handlers through `INITIAL_CLIMB -> CLIMB`, but no
-   handlers for cruise, descent, approach, final, landing, rollout, taxi-in,
-   parking, shutdown, or secured phases. The enum and event types name these
-   phases/events, but they are not currently reachable.
+2. Packaging smoke tests were added.
+   `tests/test_packaging.py` verifies the packaged rules directory and session
+   initialization path. This should catch future regressions around missing Lua
+   assets.
 
-5. One score-card test is misleading.
-   `test_no_active_caps_when_score_card_is_clean` says no active caps should
-   exist on a clean card, but its comment says the cap is active. The test passes
-   because it checks membership with a newly-created `ScoreCap` object rather
-   than the object that was added to the card.
+3. Phase detection now covers the post-climb lifecycle.
+   `PhaseDetector` now includes handlers from `CLIMB` through `CRUISE`,
+   `DESCENT`, `APPROACH`, `FINAL`, `LANDING`, `ROLLOUT`, `TAXI_IN`, `PARKING`,
+   and `SHUTDOWN`.
 
-Artifacts created
-- `.venv/` was created locally for dependency installation and full test
-  execution.
-- A temporary wheel was built under `/tmp/flight-instructor-wheel` for package
-  inspection.
-- This report file: `gpt-report.txt`.
+4. Event detection was extended.
+   New phase-transition events include descent, approach, touchdown, and
+   taxi-in start transitions.
+
+5. Lua rules can specify severity.
+   `LuaCategory.malus(points, description, severity_name=None)` now maps
+   severity strings to `Severity` enum values, defaulting to moderate for
+   unknown or absent values.
+
+6. SimConnect diagnostics improved.
+   `SimConnectSource.connect()` now distinguishes a missing Python SimConnect
+   package from an MSFS/SimConnect connection failure, and the GUI displays the
+   exception message instead of a generic retry message.
+
+7. The misleading score-card test was fixed in the previous commit.
+   The active-cap test now uses the same cap object and asserts the intended
+   behavior.
+
+Current Assessment
+The code is clean for an early-stage simulator integration project. The
+architecture is straightforward:
+
+  SimConnect telemetry -> AircraftState -> PhaseDetector -> EventDetector ->
+  LuaRunner -> ScoreCard -> GUI
+
+The module boundaries are clear, tests are broad for the simulated behavior,
+and the Lua rule approach keeps aircraft/procedure policy out of the Python
+engine. The project is no longer just a startup/takeoff prototype; it now has
+a complete nominal phase path through shutdown.
+
+Remaining Risks and Gaps
+1. Runway detection remains the largest correctness risk.
+   `SimConnectSource` still approximates `on_runway` as `on_ground`. This can
+   make ordinary ground operations look like runway context and can produce
+   false LINEUP or TAKEOFF_ROLL transitions. This is the most important live-use
+   risk because it can create unfair penalties.
+
+2. Real SimConnect values are still unverified.
+   Several SimVar names, units, and ranges need live MSFS validation, especially
+   mixture, carb heat, elevator trim, flaps, fuel selector, pitch, bank, and
+   heading. The simulator can expose values in surprising units or ranges.
+
+3. The full phase lifecycle is implemented but still heuristic.
+   The new transitions are useful and tested against simulated telemetry, but
+   real flights include level-offs during climb, go-arounds, touch-and-goes,
+   runway exits without stopping, taxi delays, and bounces. These scenarios are
+   not yet modeled.
+
+4. `SECURED` is still not reached.
+   The phase enum includes `SECURED`, but the detector currently stops at
+   `SHUTDOWN`. That may be fine for now, but the naming suggests one final
+   post-shutdown phase is intended.
+
+5. Runtime errors are still mostly status text or logs.
+   Connection diagnostics improved, but there is no structured diagnostics or
+   support bundle yet. Lua rule exceptions are logged, but the GUI does not
+   expose rule health to the user.
+
+6. Debrief experience is not built.
+   Violations carry severity, but the current GUI is still a live scrolling log.
+   A post-flight debrief grouped by severity/category/evidence would better
+   match the project goal.
+
+7. SimConnect remains intentionally undeclared.
+   This is reasonable because it is Windows-only, but it means Windows setup
+   documentation and startup checks are important. The improved error message
+   helps but does not replace install docs.
 
 Recommendations
-1. Finish the flight phase lifecycle before adding many more rules.
-   The current phase detector covers startup through climb. Add conservative,
-   well-tested transitions for cruise, descent, approach, final, landing,
-   rollout, taxi-in, parking, shutdown, and secured. Rule quality depends on
-   phase accuracy, so phase coverage is more important than expanding the rule
-   catalog right now.
+1. Prioritize real telemetry validation.
+   Add a telemetry recorder that logs raw SimConnect values next to normalized
+   `AircraftState` fields. Use it to validate units, ranges, and missing values
+   before adding more penalties.
 
-2. Treat runway detection as the main live-sim correctness problem.
-   `on_runway = on_ground` is acceptable as a temporary stub, but it can create
-   false lineup and takeoff events. Prefer a runway confidence model rather than
-   a boolean if possible: unknown, probable runway, confirmed runway. Rules that
-   can create penalties should require confirmed or high-confidence context.
+2. Replace boolean runway detection with confidence.
+   Use a runway-confidence model if possible: unknown, probable, confirmed.
+   Event-triggered penalties should require confirmed or high-confidence runway
+   context.
 
-3. Add a telemetry validation harness for real MSFS sessions.
-   Before tuning rules, log raw SimConnect values alongside normalized
-   AircraftState fields during a few real C172 flights. Verify units and ranges
-   for mixture, carb heat, trim, flaps, fuel selector, pitch, bank, and heading.
-   Keep captured logs as fixtures for regression tests where licensing/privacy
-   permits.
+3. Add live-derived regression fixtures.
+   Once real telemetry logs are available, convert representative flights into
+   test fixtures: normal flight, long taxi, rejected takeoff, go-around,
+   touch-and-go, bounced landing, and shutdown.
 
-4. Improve runtime diagnostics in the GUI.
-   Missing SimConnect, missing MSFS, missing rules, and Lua rule errors should
-   not all look like a generic retry state. Surface concise status messages and
-   write detailed logs to a file so user reports are actionable.
+4. Add scenarios for non-nominal phase paths.
+   The new lifecycle tests cover the nominal path. Add tests for go-around,
+   missed approach, touch-and-go, descent during climb, climb after descent,
+   landing rollout without stopping, and shutdown without a full taxi-in.
 
-5. Let Lua rules specify severity and possibly confidence.
-   `category.malus()` currently hardcodes `Severity.MODERATE`. Add an API such
-   as `safety.malus(points, description, severity)` or named helpers like
-   `safety.minor(...)`, `safety.serious(...)`, and `safety.critical(...)`.
-   This will make debriefs and score caps align better with the design goals.
+5. Decide what `SECURED` means.
+   Either implement a `SHUTDOWN -> SECURED` transition using detectable
+   evidence, or remove/defer the phase until there is a reliable rule for it.
 
-6. Keep rule enforcement conservative.
-   For ambiguous procedures, prefer notes or warnings over score deductions.
-   In particular, avoid penalizing anything tied to uncertain runway detection,
-   aircraft-specific optional SOPs, or unverified SimConnect values until the
-   telemetry evidence is strong.
+6. Make diagnostics persistent.
+   Write connection failures, Lua rule errors, missing rule files, and telemetry
+   read failures to a local log file. Keep GUI messages concise, but make the
+   underlying problem inspectable.
 
-7. Add integration tests around packaged artifacts.
-   Build a wheel in CI and assert that `flight_instructor/rules/global.lua` and
-   `flight_instructor/rules/c172.lua` are present. Also add a smoke test for
-   `Session(_rules_dir())` so packaging regressions are caught before release.
+7. Build the debrief around severity and evidence.
+   Now that severity exists, expose it. A useful debrief should group issues by
+   severity/category, show timestamps, malus, raw evidence, and rule rationale.
 
-8. Separate environment problems from application problems.
-   Since SimConnect is Windows-only and intentionally not declared as a normal
-   dependency, document the Windows install path and add a startup check that
-   clearly reports when the Python SimConnect package is unavailable.
+8. Keep rule additions conservative.
+   Do not add many new malus rules until runway context and SimVar ranges are
+   validated. Ambiguous findings should be notes or warnings rather than score
+   deductions.
 
-9. Grow tests with behavior, not implementation.
-   The current test suite is useful. Continue adding scenario-style tests using
-   simulated telemetry for each new phase transition and each new Lua rule. Add
-   a small number of regression tests from real telemetry logs once available.
+9. Keep the current structure.
+   The code does not need a broad refactor right now. The highest-value work is
+   validation, diagnostics, phase edge cases, and debrief output.
 
-10. Avoid broad refactors for now.
-    The code is readable and modular enough. The next quality improvements
-    should be targeted: phase coverage, telemetry confidence, diagnostics,
-    severity support, and packaging/runtime smoke tests.
+Bottom Line
+The project is in a healthier state than during my first review. The major
+packaging issue, the misleading test, incomplete phase lifecycle, and flat Lua
+severity were all addressed. The remaining concerns are mostly about live MSFS
+truth and product completeness rather than code cleanliness.

@@ -21,19 +21,22 @@ def _rules_dir():
 
 def main():
     """Entry point."""
+    source = None
     try:
         rules_dir = _rules_dir()
         session = Session(rules_dir)
         source = SimConnectSource()
         app = App(session, source)
         app.mainloop()
-        source.disconnect()
     except Exception as exc:
         import tkinter as tk
         from tkinter import messagebox
         root = tk.Tk()
         root.withdraw()
         messagebox.showerror("FlightInstructor - Startup Error", str(exc))
+    finally:
+        if source is not None:
+            source.disconnect()
 
 
 if __name__ == "__main__":
