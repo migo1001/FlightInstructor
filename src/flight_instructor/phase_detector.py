@@ -50,9 +50,14 @@ class PhaseDetector:
         """Initialize with the aircraft assumed to be cold and dark."""
         self.phase = Phase.COLD_AND_DARK
         self._timers = {}
+        self._snapped = False
 
     def update(self, state, timestamp):
         """Process one telemetry sample and advance the phase state machine if warranted."""
+        if not self._snapped:
+            self._snap_to_initial_phase(state)
+            self._snapped = True
+
         handlers = {
             Phase.COLD_AND_DARK: self._from_cold_and_dark,
             Phase.PRE_TAXI: self._from_pre_taxi,
@@ -266,6 +271,33 @@ class PhaseDetector:
             self.SHUTDOWN_SECONDS,
             timestamp,
         )
+
+    # ------------------------------------------------------------------
+    # Initial phase snap
+    # ------------------------------------------------------------------
+
+    def _snap_to_initial_phase(self, state):
+        """
+        Set the opening phase from actual aircraft state on the very first frame.
+
+        Prevents the detector from being stuck at COLD_AND_DARK when the user
+        loads into a flight that is already airborne or already moving.
+        Ground-based engine states are intentionally left to normal hysteresis
+        (COLD_AND_DARK -> PRE_TAXI) because the 2-second threshold is meaningful
+        there; only clearly unambiguous states are snapped immediately.
+        """
+        if not state.on_ground:
+            if state.altitude_agl_ft > 3000:
+                self.phase = Phase.CRUISE
+            elif state.altitude_agl_ft > self.CRUISE_AGL_FT:
+                self.phase = Phase.CLIMB
+            elif state.altitude_agl_ft > self.FINAL_AGL_FT:
+                self.phase = Phase.INITIAL_CLIMB
+            else:
+                self.phase = Phase.FINAL
+        elif state.ground_speed_kt > self.TAXI_SPEED_KT:
+            self.phase = Phase.TAXI_OUT
+        # engine running on ground: leave COLD_AND_DARK, normal hysteresis takes over
 
     # ------------------------------------------------------------------
     # Hysteresis primitive

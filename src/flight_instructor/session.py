@@ -13,6 +13,7 @@ class Session:
     Owns the phase detector, event detector, Lua rule runner, and score card.
     Call update() once per telemetry frame; it returns any violations that were
     newly recorded during that frame so the caller can display them immediately.
+    Call reset() to start a fresh session (e.g. after a new flight loads).
     """
 
     RULE_FILES = ["global.lua", "c172.lua"]
@@ -23,15 +24,47 @@ class Session:
 
         rules_dir — path to the directory containing the .lua rule files
         """
+        self._rules_dir = Path(rules_dir)
+        self._score_card = None
+        self._phase_detector = None
+        self._event_detector = None
+        self._lua_runner = None
+        self._start_time = None
+        self._end_time = None
+        self._reset_internals()
+
+    def reset(self):
+        """Discard all session state and prepare for a new flight."""
+        self._start_time = None
+        self._end_time = None
+        self._reset_internals()
+
+    def _reset_internals(self):
+        """Recreate all stateful sub-objects."""
         self._score_card = ScoreCard()
         self._phase_detector = PhaseDetector()
         self._event_detector = EventDetector()
         self._lua_runner = LuaRunner()
-        self._start_time = None
-
-        rules_dir = Path(rules_dir)
         for filename in self.RULE_FILES:
-            self._lua_runner.load_file(str(rules_dir / filename))
+            self._lua_runner.load_file(str(self._rules_dir / filename))
+
+    @property
+    def has_data(self):
+        """True once at least one telemetry frame has been processed."""
+        return self._start_time is not None
+
+    @property
+    def flight_duration(self):
+        """Elapsed flight time in seconds, or None if no data yet."""
+        if self._start_time is None:
+            return None
+        end = self._end_time if self._end_time is not None else self._start_time
+        return end - self._start_time
+
+    def mark_ended(self, wall_time):
+        """Record the wall time when the flight connection was lost."""
+        if self._start_time is not None:
+            self._end_time = wall_time
 
     def update(self, state, wall_time):
         """
@@ -42,6 +75,7 @@ class Session:
         """
         if self._start_time is None:
             self._start_time = wall_time
+        self._end_time = wall_time
         timestamp = wall_time - self._start_time
 
         before = len(self._score_card.violations())

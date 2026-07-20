@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import scrolledtext
 
+from flight_instructor.phase import Phase
 from flight_instructor.score_category import ScoreCategory
 
 
@@ -128,12 +129,17 @@ class App(tk.Tk):
 
         for category, colour in _CATEGORY_COLORS.items():
             self._log.tag_config(category.name, foreground=colour)
-        self._log.tag_config("time",    foreground=_FG_DIM)
-        self._log.tag_config("malus",   foreground="#F87171")
-        self._log.tag_config("desc",    foreground=_FG_SCORE)
-        self._log.tag_config("conn_ok", foreground=_FG_STATUS)
-        self._log.tag_config("conn_err",foreground=_FG_STATUS_ERR)
-        self._log.tag_config("conn_dim",foreground=_FG_CONN_LOG)
+        self._log.tag_config("time",         foreground=_FG_DIM)
+        self._log.tag_config("malus",        foreground="#F87171")
+        self._log.tag_config("desc",         foreground=_FG_SCORE)
+        self._log.tag_config("conn_ok",      foreground=_FG_STATUS)
+        self._log.tag_config("conn_err",     foreground=_FG_STATUS_ERR)
+        self._log.tag_config("conn_dim",     foreground=_FG_CONN_LOG)
+        self._log.tag_config("summary_sep",  foreground="#374151")
+        self._log.tag_config("summary_head", foreground="#93C5FD")
+        self._log.tag_config("summary_val",  foreground=_FG_SCORE)
+        self._log.tag_config("summary_good", foreground=_FG_STATUS)
+        self._log.tag_config("summary_bad",  foreground=_FG_STATUS_ERR)
 
     def _build_status(self):
         """Bottom status bar — last connection message."""
@@ -188,6 +194,10 @@ class App(tk.Tk):
         if state is None:
             self._set_connected(False)
             self._append_conn("[FAIL] Connection lost.", "conn_err")
+            if self._session.has_data:
+                self._session.mark_ended(time.monotonic())
+                self._show_summary()
+                self._session.reset()
             self.after(self.RETRY_MS, self._try_connect)
             return
 
@@ -226,5 +236,61 @@ class App(tk.Tk):
         self._log.insert(tk.END, f"{category_label:<12}", colour_tag)
         self._log.insert(tk.END, f"  -{violation.malus:<3}  ", "malus")
         self._log.insert(tk.END, f"{violation.description}\n", "desc")
+        self._log.configure(state=tk.DISABLED)
+        self._log.see(tk.END)
+
+    def _show_summary(self):
+        """Render a flight debrief block in the scrolling log."""
+        session      = self._session
+        score_card   = session.score_card
+        violations   = score_card.violations()
+        score        = score_card.score()
+        duration     = session.flight_duration or 0
+        phase_name   = session.phase.value.replace("_", " ").title()
+
+        minutes, seconds = divmod(int(duration), 60)
+        hours, minutes   = divmod(minutes, 60)
+        dur_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
+
+        sep = "─" * 48
+
+        self._log.configure(state=tk.NORMAL)
+        self._log.insert(tk.END, f"\n{sep}\n", "summary_sep")
+        self._log.insert(tk.END, "  FLIGHT SUMMARY\n", "summary_head")
+        self._log.insert(tk.END, f"{sep}\n", "summary_sep")
+
+        score_tag = "summary_good" if score >= 80 else "summary_bad"
+        self._log.insert(tk.END, f"  Score:   ", "time")
+        self._log.insert(tk.END, f"{score}", score_tag)
+        self._log.insert(tk.END, " / 100", "time")
+        self._log.insert(tk.END, f"    Phase: {phase_name}    Time: {dur_str}\n", "time")
+
+        active_caps = score_card.active_caps()
+        if active_caps:
+            cap_str = ", ".join(f"cap {c.max_score}" for c in active_caps)
+            self._log.insert(tk.END, f"  Caps:    {cap_str}\n", "summary_bad")
+
+        if violations:
+            total_malus = sum(v.malus for v in violations)
+            self._log.insert(tk.END, f"\n  VIOLATIONS  ({len(violations)} total, -{total_malus} pts)\n", "summary_head")
+            for v in violations:
+                label = _CATEGORY_LABELS.get(v.category, v.category.name)
+                tag   = v.category.name
+                self._log.insert(tk.END, f"  [{v.timestamp:7.1f}s]  ", "time")
+                self._log.insert(tk.END, f"{label:<12}", tag)
+                self._log.insert(tk.END, f"  -{v.malus:<3}  ", "malus")
+                self._log.insert(tk.END, f"{v.description}\n", "desc")
+
+            self._log.insert(tk.END, f"\n  BY CATEGORY\n", "summary_head")
+            for category in ScoreCategory:
+                cat_score = score_card.category_score(category)
+                label     = _CATEGORY_LABELS.get(category, category.name)
+                tag       = "summary_good" if cat_score >= 80 else "summary_bad"
+                self._log.insert(tk.END, f"  {label:<14}", "time")
+                self._log.insert(tk.END, f"{cat_score}\n", tag)
+        else:
+            self._log.insert(tk.END, "\n  No violations recorded. Clean flight!\n", "summary_good")
+
+        self._log.insert(tk.END, f"{sep}\n\n", "summary_sep")
         self._log.configure(state=tk.DISABLED)
         self._log.see(tk.END)
