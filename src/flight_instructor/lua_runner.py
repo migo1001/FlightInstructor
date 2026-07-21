@@ -28,6 +28,7 @@ class LuaRunner:
         position.*                  — position/motion fields
         controls.*                  — control fields
         attitude.*                  — attitude fields
+        weather.*                   — wind, visibility, in_cloud
     """
 
     def __init__(self):
@@ -142,6 +143,13 @@ class LuaRunner:
             bank_deg=state.bank_deg,
             pitch_deg=state.pitch_deg,
             heading_deg=state.heading_deg,
+        )
+
+        g.weather = self._lua.table(
+            wind_speed_kt=state.wind_speed_kt,
+            wind_direction_deg=state.wind_direction_deg,
+            visibility_m=state.visibility_m,
+            in_cloud=state.in_cloud,
         )
 
     def _update_events(self, events):

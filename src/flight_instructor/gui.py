@@ -80,6 +80,7 @@ class App(tk.Tk):
         """Build all widgets."""
         self._build_header()
         self._build_location_bar()
+        self._build_weather_bar()
         self._build_log()
         self._build_status()
 
@@ -125,6 +126,20 @@ class App(tk.Tk):
         tk.Label(
             frame,
             textvariable=self._location_var,
+            fg=_FG_DIM, bg=_BG_PANEL,
+            font=tkfont.Font(family="Consolas", size=11),
+            anchor="w",
+        ).pack(side=tk.LEFT)
+
+    def _build_weather_bar(self):
+        """Slim bar showing wind, visibility, and active runway."""
+        frame = tk.Frame(self, bg=_BG_PANEL, padx=16, pady=4)
+        frame.pack(fill=tk.X, side=tk.TOP)
+
+        self._weather_var = tk.StringVar(value="")
+        tk.Label(
+            frame,
+            textvariable=self._weather_var,
             fg=_FG_DIM, bg=_BG_PANEL,
             font=tkfont.Font(family="Consolas", size=11),
             anchor="w",
@@ -252,12 +267,38 @@ class App(tk.Tk):
     # ------------------------------------------------------------------
 
     def _update_header(self, state=None):
-        """Refresh phase label, score, and location bar."""
+        """Refresh phase label, score, location bar, and weather bar."""
         phase_name = self._session.phase.value.replace("_", " ").title()
         self._phase_var.set(f"Phase: {phase_name}")
         self._score_var.set(f"Score: {self._session.score}")
         if state is not None:
             self._location_var.set(self._location.describe(state))
+            self._weather_var.set(self._format_weather(state))
+
+    def _format_weather(self, state):
+        """Build the weather bar string from wind, visibility, and active runway."""
+        wind_spd = state.wind_speed_kt
+        wind_dir = state.wind_direction_deg
+
+        if wind_spd < 3:
+            wind_str = "Wind Calm"
+        else:
+            wind_str = f"Wind {wind_dir:03.0f}° / {wind_spd:.0f} kt"
+
+        parts = [wind_str]
+
+        if state.visibility_m < 8000:
+            km = state.visibility_m / 1000.0
+            parts.append(f"{km:.1f} km vis")
+
+        icao = self._location._cached_icao
+        if icao and wind_spd >= 3 and self._facilities.has_data(icao):
+            rwys = self._facilities.active_runways(icao, wind_dir, wind_spd)
+            if rwys:
+                rwy_str = ", ".join(r.designator for r in rwys)
+                parts.append(f"Rwy {rwy_str}")
+
+        return "   ·   ".join(parts)
 
     def _append_conn(self, message, tag):
         """Append a connection status line to the log."""

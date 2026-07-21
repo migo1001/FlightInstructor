@@ -49,5 +49,11 @@ class AircraftState:
         self.carb_heat_on = kwargs.get("carb_heat_on", False)
         self.outside_air_temp_c = kwargs.get("outside_air_temp_c", 15.0)
 
+        # Weather
+        self.wind_speed_kt     = kwargs.get("wind_speed_kt",     0.0)
+        self.wind_direction_deg = kwargs.get("wind_direction_deg", 0.0)
+        self.visibility_m      = kwargs.get("visibility_m",      10000.0)
+        self.in_cloud          = kwargs.get("in_cloud",          False)
+
         # Warnings (pre-computed by the simulator)
         self.stall_warning = kwargs.get("stall_warning", False)

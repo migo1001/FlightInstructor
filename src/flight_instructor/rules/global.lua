@@ -47,6 +47,21 @@ register(function()
     end
 end)
 
+-- VFR cloud entry (airborne only)
+local _in_cloud_active = false
+register(function()
+    if position.on_ground then
+        _in_cloud_active = false
+        return
+    end
+    if weather.in_cloud and not _in_cloud_active then
+        _in_cloud_active = true
+        navigation.malus(10, "Flying in cloud under VFR.", "serious")
+    elseif not weather.in_cloud then
+        _in_cloud_active = false
+    end
+end)
+
 -- Excessive taxi speed (taxi phases only)
 local TAXI_SPEED_LIMIT_KT = 20.0
 local TAXI_PHASES = { taxi_out = true, taxi_in = true }

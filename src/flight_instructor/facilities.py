@@ -226,6 +226,25 @@ class AirportFacilities:
             candidates = self.runways
         return min(candidates, key=lambda r: _dist(lat, lon, r.lat, r.lon))
 
+    def active_runways(self, wind_direction_deg, wind_speed_kt=0):
+        """
+        Return runway ends that face into the wind.
+
+        Returns an empty list for calm winds (< 3 kt) — any runway is valid.
+        Otherwise returns all ends within 90° of the wind direction, sorted
+        by alignment (most favourable first).
+        """
+        if not self.runways or wind_speed_kt < 3:
+            return []
+        candidates = [
+            r for r in self.runways
+            if abs(_angle_diff(_designator_heading(r.designator), wind_direction_deg)) < 90
+        ]
+        return sorted(
+            candidates,
+            key=lambda r: abs(_angle_diff(_designator_heading(r.designator), wind_direction_deg)),
+        )
+
 
 # ── geometry helpers ──────────────────────────────────────────────────────────
 
@@ -352,6 +371,13 @@ class FacilitiesClient:
         """Return True once facilities data for *icao* is fully received."""
         fac = self._get_cache(icao)
         return fac is not None and fac.complete
+
+    def active_runways(self, icao, wind_direction_deg, wind_speed_kt=0):
+        """Return into-wind runway ends for *icao*, or an empty list."""
+        fac = self._get_cache(icao)
+        if fac is None or not fac.complete:
+            return []
+        return fac.active_runways(wind_direction_deg, wind_speed_kt)
 
     # ------------------------------------------------------------------
     # Internals

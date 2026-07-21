@@ -33,6 +33,9 @@ class SimConnectSource:
         "TRAILING_EDGE_FLAPS_LEFT_ANGLE":       "flaps_deg",
         "ELEVATOR_TRIM_PCT":                    "elevator_trim_pct",
         "AMBIENT_TEMPERATURE":                  "outside_air_temp_c",
+        "AMBIENT_WIND_VELOCITY":                "wind_speed_kt",
+        "AMBIENT_WIND_DIRECTION":               "wind_direction_deg",
+        "AMBIENT_VISIBILITY":                   "visibility_m",
     }
 
     # SimVar name → kwargs key for AircraftState (boolean: nonzero = True)
@@ -48,6 +51,7 @@ class SimConnectSource:
         "LIGHT_STROBE":               "strobe_on",
         "PITOT_HEAT":                 "pitot_heat_on",
         "STALL_WARNING":              "stall_warning",
+        "AMBIENT_IN_CLOUD":           "in_cloud",
     }
 
     def __init__(self):
