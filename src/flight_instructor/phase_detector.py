@@ -281,10 +281,9 @@ class PhaseDetector:
         Set the opening phase from actual aircraft state on the very first frame.
 
         Prevents the detector from being stuck at COLD_AND_DARK when the user
-        loads into a flight that is already airborne or already moving.
-        Ground-based engine states are intentionally left to normal hysteresis
-        (COLD_AND_DARK -> PRE_TAXI) because the 2-second threshold is meaningful
-        there; only clearly unambiguous states are snapped immediately.
+        loads into a flight that is already airborne or lined up on a runway.
+        Ground-based engine states use normal hysteresis (COLD_AND_DARK → PRE_TAXI)
+        because the 2-second threshold is meaningful there.
         """
         if not state.on_ground:
             if state.altitude_agl_ft > 3000:
@@ -295,9 +294,14 @@ class PhaseDetector:
                 self.phase = Phase.INITIAL_CLIMB
             else:
                 self.phase = Phase.FINAL
+        elif state.on_runway:
+            if state.ground_speed_kt > self.TAKEOFF_SPEED_KT:
+                self.phase = Phase.TAKEOFF_ROLL
+            else:
+                self.phase = Phase.LINEUP
         elif state.ground_speed_kt > self.TAXI_SPEED_KT:
             self.phase = Phase.TAXI_OUT
-        # engine running on ground: leave COLD_AND_DARK, normal hysteresis takes over
+        # stationary on ground, not on runway: leave COLD_AND_DARK, normal hysteresis
 
     # ------------------------------------------------------------------
     # Hysteresis primitive

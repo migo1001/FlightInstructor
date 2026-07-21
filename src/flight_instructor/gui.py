@@ -187,6 +187,14 @@ class App(tk.Tk):
     # Poll loop
     # ------------------------------------------------------------------
 
+    # Phases that are worth logging when the snap detects them on first frame
+    _SNAP_LOG_PHASES = frozenset({
+        Phase.LINEUP, Phase.TAKEOFF_ROLL,
+        Phase.INITIAL_CLIMB, Phase.CLIMB, Phase.CRUISE,
+        Phase.DESCENT, Phase.APPROACH, Phase.FINAL,
+        Phase.TAXI_OUT,
+    })
+
     def _poll(self):
         """Read one telemetry frame and process it."""
         state = self._source.read()
@@ -201,9 +209,19 @@ class App(tk.Tk):
             self.after(self.RETRY_MS, self._try_connect)
             return
 
+        first_frame = not self._session.has_data
         new_violations = self._session.update(state, time.monotonic())
         for v in new_violations:
             self._append_violation(v)
+
+        if first_frame and self._session.phase in self._SNAP_LOG_PHASES:
+            phase_name = self._session.phase.value.replace("_", " ").title()
+            self._append_conn(f"[Detected] Starting in {phase_name}", "conn_ok")
+
+        if self._session.phase == Phase.SHUTDOWN:
+            self._session.mark_ended(time.monotonic())
+            self._show_summary()
+            self._session.reset()
 
         self._update_header()
         self.after(self.POLL_MS, self._poll)

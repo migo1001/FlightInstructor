@@ -10,11 +10,6 @@ class SimConnectSource:
 
     On any connection error the source drops to disconnected state and the
     caller can retry by calling connect() again.
-
-    NOTE: on_runway is approximated as on_ground because MSFS does not expose
-    a reliable per-user-aircraft "on runway" flag via SimConnect.  The phase
-    detector may briefly enter LINEUP on slow-speed taxi; this is a known
-    limitation to be improved with GPS + airport-database lookup.
     """
 
     POLL_INTERVAL_MS = 200  # 5 Hz
@@ -41,6 +36,7 @@ class SimConnectSource:
     # SimVar name → kwargs key for AircraftState (boolean: nonzero = True)
     _BOOL_VARS = {
         "SIM_ON_GROUND":              "on_ground",
+        "ON_ANY_RUNWAY":              "on_runway",
         "GENERAL_ENG_COMBUSTION:1":   "engine_running",
         "BRAKE_PARKING_INDICATOR":    "parking_brake",
         "LIGHT_BEACON":               "beacon_on",
@@ -111,11 +107,28 @@ class SimConnectSource:
         """
         if not self._connected:
             return None
+        if not self._is_sim_alive():
+            self.disconnect()
+            return None
         try:
             return self._build_state()
         except Exception:
             self.disconnect()
             return None
+
+    def _is_sim_alive(self):
+        """
+        Return False when the SimConnect background thread has stopped.
+
+        The Python-SimConnect library drives updates in a daemon thread.
+        If MSFS exits or drops the connection, that thread dies.  When it
+        does, subsequent get() calls return stale cached values forever —
+        so we check thread liveness to detect a dead connection early.
+        """
+        thread = getattr(self._sm, 'thread', None)
+        if thread is None:
+            return True
+        return thread.is_alive()
 
     # ------------------------------------------------------------------
     # Internals
@@ -138,9 +151,6 @@ class SimConnectSource:
         self._read_oil_temp(kwargs)
         self._read_carb_heat(kwargs)
         self._read_fuel_selector(kwargs)
-
-        # on_runway approximation — see class docstring
-        kwargs["on_runway"] = kwargs.get("on_ground", True)
 
         return AircraftState(**kwargs)
 
