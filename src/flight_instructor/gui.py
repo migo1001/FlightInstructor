@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import scrolledtext
 
+from flight_instructor.facilities import FacilitiesClient
 from flight_instructor.location import LocationService
 from flight_instructor.phase import Phase
 from flight_instructor.score_category import ScoreCategory
@@ -58,7 +59,8 @@ class App(tk.Tk):
         super().__init__()
         self._session       = session
         self._source        = source
-        self._location      = LocationService()
+        self._facilities    = FacilitiesClient()
+        self._location      = LocationService(facilities=self._facilities)
         self._retry_count   = 0
         self._connected     = False
 
@@ -185,6 +187,7 @@ class App(tk.Tk):
             self._source.connect()
             self._set_connected(True)
             self._append_conn("[OK] Connected to MSFS 2020.", "conn_ok")
+            self._facilities.connect()
             self.after(self.POLL_MS, self._poll)
         except Exception as exc:
             self._set_connected(False)
@@ -219,6 +222,7 @@ class App(tk.Tk):
         if state is None:
             self._set_connected(False)
             self._append_conn("[FAIL] Connection lost.", "conn_err")
+            self._facilities.disconnect()
             if self._session.has_data:
                 self._session.mark_ended(time.monotonic())
                 self._show_summary()

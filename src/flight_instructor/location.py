@@ -6,32 +6,35 @@ class LocationService:
     """
     Resolves the aircraft's lat/lon to a human-readable position label.
 
-    Uses the airportsdata package (bundled with the exe) to find the nearest
-    airport by ICAO code, then combines that with runway and surface state to
-    produce a label such as:
-        "Rwy 27 at LFPG"
-        "Taxiing at LFPO"
-        "Ramp at LFPN"
-        "Airborne · LFPG"
-        "Airborne"
+    When a FacilitiesClient is provided (and has received data for the current
+    airport), the label is precise:
+        "Gate F32 at LFPG"      — parked at a named gate
+        "Ramp 7 at LFPG"        — parked at a numbered ramp
+        "Rwy 27L at LFPG"       — on-runway with exact L/R/C suffix
+        "Taxiing at LFPO"        — ground, moving, no facilities yet
+        "Airborne · LFPG"        — airborne near an airport
+        "Airborne"               — en route, no airport within range
 
-    Gate and taxiway letter identification requires SimConnect's Facilities API,
-    which is not yet exposed by the Python SimConnect library.
+    Without a FacilitiesClient (or while waiting for the async response),
+    runway designator is estimated from heading and parked position shows "Ramp".
 
-    The nearest-airport search is O(n) with a bounding-box pre-filter and is
-    cached; it runs at most once every UPDATE_INTERVAL_S seconds.
+    The nearest-airport search is O(n) with a bounding-box pre-filter; it runs
+    at most once every UPDATE_INTERVAL seconds and its result is cached.
     """
 
-    NEARBY_KM       = 50.0   # Report airport name if within this distance
-    UPDATE_INTERVAL = 5.0    # Seconds between nearest-airport searches
+    NEARBY_KM       = 50.0
+    UPDATE_INTERVAL = 5.0
     EARTH_R_KM      = 6371.0
 
-    def __init__(self):
-        """Load the airport database once at startup."""
-        self._airports        = self._load_airports()
-        self._cached_icao     = None
-        self._cached_km       = None
-        self._last_search     = None
+    def __init__(self, facilities=None):
+        """
+        facilities — optional FacilitiesClient; if provided, gate/runway names
+                     are retrieved from SimConnect rather than estimated.
+        """
+        self._airports      = self._load_airports()
+        self._facilities    = facilities
+        self._cached_icao   = None
+        self._last_search   = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -41,13 +44,19 @@ class LocationService:
         """
         Return a position string for the current aircraft state.
 
-        Returns an empty string if no lat/lon data is available yet.
+        Returns an empty string when lat/lon is not yet available.
         """
         lat, lon = state.latitude, state.longitude
         if lat == 0.0 and lon == 0.0:
             return ""
 
+        prev_icao = self._cached_icao
         self._refresh_if_due(lat, lon)
+
+        # When we arrive at a new airport, kick off an async facilities request
+        if self._cached_icao and self._cached_icao != prev_icao and self._facilities:
+            self._facilities.request_airport(self._cached_icao)
+
         return self._format(state)
 
     # ------------------------------------------------------------------
@@ -88,7 +97,6 @@ class LocationService:
                 best_icao = icao
 
         self._cached_icao = best_icao
-        self._cached_km   = best_km if best_icao else None
 
     def _haversine(self, lat1, lon1, lat2, lon2):
         """Return great-circle distance in km."""
@@ -105,29 +113,60 @@ class LocationService:
     # ------------------------------------------------------------------
 
     def _format(self, state):
-        """Build the position string from cached airport and current state."""
-        at = f" at {self._cached_icao}" if self._cached_icao else ""
+        """Build the position string from cached airport + facilities data."""
+        icao = self._cached_icao
+        at   = f" at {icao}" if icao else ""
 
         if not state.on_ground:
-            if self._cached_icao:
-                return f"Airborne · {self._cached_icao}"
-            return "Airborne"
+            return f"Airborne · {icao}" if icao else "Airborne"
 
         if state.on_runway:
-            rwy = self._runway_from_heading(state.heading_deg)
-            return f"Rwy {rwy}{at}"
+            return f"Rwy {self._runway_label(state, icao)}{at}"
 
         if state.ground_speed_kt < 1.0:
-            return f"Ramp{at}"
+            label = self._parking_label(state, icao)
+            return f"{label}{at}"
 
         return f"Taxiing{at}"
 
-    def _runway_from_heading(self, heading_deg):
+    def _runway_label(self, state, icao):
         """
-        Approximate runway designator from magnetic heading.
+        Return a runway designator string.
 
-        Runway 27 has heading ~270°, runway 09 has heading ~090°, etc.
-        L/R/C suffixes require a runway database and are omitted.
+        Uses SimConnect Facilities runway threshold positions when available
+        (gives exact L/R/C suffix). Falls back to heading-derived estimate.
+        """
+        if self._facilities and icao and self._facilities.has_data(icao):
+            rwy = self._facilities.nearest_runway(
+                state.latitude, state.longitude, state.heading_deg, icao
+            )
+            if rwy:
+                return rwy.designator
+
+        return self._rwy_from_heading(state.heading_deg)
+
+    def _parking_label(self, state, icao):
+        """
+        Return a parking label: 'Gate F32', 'Ramp 7', etc.
+
+        Uses SimConnect Facilities gate/stand data when available.
+        Falls back to 'Ramp' while data is loading or unavailable.
+        """
+        if self._facilities and icao:
+            if not self._facilities.has_data(icao):
+                # Data still loading — show "Ramp" until it arrives
+                return "Ramp"
+            spot = self._facilities.nearest_parking(state.latitude, state.longitude, icao)
+            if spot:
+                return spot.label
+
+        return "Ramp"
+
+    def _rwy_from_heading(self, heading_deg):
+        """
+        Estimate runway designator from magnetic heading.
+
+        Runway 27 ≈ 270°, runway 09 ≈ 090°.  L/R/C requires threshold data.
         """
         rwy_num = round(heading_deg / 10) % 36
         if rwy_num == 0:
