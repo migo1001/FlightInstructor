@@ -246,13 +246,14 @@ class TestToTakeoffRoll:
         telemetry.feed(detector, telemetry.takeoff_roll(), seconds=4)
         assert detector.phase == Phase.TAKEOFF_ROLL
 
-    def test_full_power_off_runway_stays_taxi_out(self):
-        """Run-up at full power off the runway must not trigger takeoff roll."""
+    def test_full_power_high_speed_triggers_takeoff_roll_regardless_of_runway_simvar(self):
+        """High throttle at 40 kt on the ground means takeoff roll even if on_runway is False.
+        ON_ANY_RUNWAY is unreliable; speed + throttle is the deciding signal."""
         telemetry = SimulatedTelemetry()
         detector = PhaseDetector()
         _advance_to_taxi_out(telemetry, detector)
         telemetry.feed(detector, telemetry.takeoff_roll(on_runway=False), seconds=4)
-        assert detector.phase == Phase.TAXI_OUT
+        assert detector.phase == Phase.TAKEOFF_ROLL
 
 
 # ---------------------------------------------------------------------------

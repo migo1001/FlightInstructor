@@ -126,7 +126,7 @@ class LocationService:
         if not state.on_ground:
             return f"Airborne · {icao}" if icao else "Airborne"
 
-        if state.on_runway:
+        if self._near_runway(state, icao):
             return f"Rwy {self._runway_label(state, icao)}{at}"
 
         if state.ground_speed_kt < 1.0:
@@ -134,6 +134,26 @@ class LocationService:
             return f"{label}{at}"
 
         return f"Taxiing{at}"
+
+    def _near_runway(self, state, icao):
+        """
+        Return True when the aircraft is on or near a runway threshold.
+
+        Prefers the ON_ANY_RUNWAY SimVar when available; falls back to
+        checking proximity to the nearest heading-matched threshold from
+        facilities data, because the SimVar is unreliable via Python-SimConnect.
+        """
+        if state.on_runway:
+            return True
+        if not (self._facilities and icao and self._facilities.has_data(icao)):
+            return False
+        rwy = self._facilities.nearest_runway(
+            state.latitude, state.longitude, state.heading_deg, icao
+        )
+        if rwy is None:
+            return False
+        dist_km = self._haversine(state.latitude, state.longitude, rwy.lat, rwy.lon)
+        return dist_km < 1.5
 
     def _runway_label(self, state, icao):
         """

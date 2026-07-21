@@ -107,8 +107,18 @@ class PhaseDetector:
 
     def _from_taxi_out(self, state, timestamp):
         """Taxi out: check for takeoff roll (highest priority), then lineup, then run-up."""
+        # Guard: if we somehow lifted off while still in TAXI_OUT (e.g. ON_ANY_RUNWAY
+        # SimVar was unreliable and TAKEOFF_ROLL was never detected), recover by
+        # jumping straight to ROTATION so the airborne chain can continue.
+        if self._transition_if_held(
+            "airborne_from_taxi", not state.on_ground, Phase.ROTATION, self.AIRBORNE_SECONDS, timestamp
+        ):
+            return
+
+        # Takeoff roll: high throttle + accelerating on the ground.
+        # Deliberately does not require on_runway — the SimVar is unreliable.
         takeoff_conditions = (
-            state.on_runway
+            state.on_ground
             and state.throttle_pct >= self.TAKEOFF_THROTTLE_PCT
             and state.ground_speed_kt > self.TAKEOFF_SPEED_KT
         )
@@ -139,8 +149,13 @@ class PhaseDetector:
 
     def _from_lineup(self, state, timestamp):
         """Lined up on runway: wait for takeoff power and acceleration."""
+        if self._transition_if_held(
+            "airborne_from_lineup", not state.on_ground, Phase.ROTATION, self.AIRBORNE_SECONDS, timestamp
+        ):
+            return
+        # Same as TAXI_OUT: do not require on_runway here.
         takeoff_conditions = (
-            state.on_runway
+            state.on_ground
             and state.throttle_pct >= self.TAKEOFF_THROTTLE_PCT
             and state.ground_speed_kt > self.TAKEOFF_SPEED_KT
         )
@@ -281,9 +296,11 @@ class PhaseDetector:
         Set the opening phase from actual aircraft state on the very first frame.
 
         Prevents the detector from being stuck at COLD_AND_DARK when the user
-        loads into a flight that is already airborne or lined up on a runway.
-        Ground-based engine states use normal hysteresis (COLD_AND_DARK → PRE_TAXI)
-        because the 2-second threshold is meaningful there.
+        loads into a flight that is already airborne or taxiing.  Ground-based
+        engine states use normal hysteresis (COLD_AND_DARK → PRE_TAXI).
+
+        on_runway is deliberately not used here: the ON_ANY_RUNWAY SimVar is
+        unreliable in the Python-SimConnect library.
         """
         if not state.on_ground:
             if state.altitude_agl_ft > 3000:
@@ -294,14 +311,9 @@ class PhaseDetector:
                 self.phase = Phase.INITIAL_CLIMB
             else:
                 self.phase = Phase.FINAL
-        elif state.on_runway:
-            if state.ground_speed_kt > self.TAKEOFF_SPEED_KT:
-                self.phase = Phase.TAKEOFF_ROLL
-            else:
-                self.phase = Phase.LINEUP
         elif state.ground_speed_kt > self.TAXI_SPEED_KT:
             self.phase = Phase.TAXI_OUT
-        # stationary on ground, not on runway: leave COLD_AND_DARK, normal hysteresis
+        # stationary on ground: leave COLD_AND_DARK, normal hysteresis applies
 
     # ------------------------------------------------------------------
     # Hysteresis primitive
