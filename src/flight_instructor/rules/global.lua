@@ -5,10 +5,10 @@
 -- Stall warning
 local _stall_active = false
 register(function()
-    if stall_warning and not _stall_active then
+    if warnings.stall and not _stall_active then
         _stall_active = true
         safety.malus(15, "Stall warning active.", "critical")
-    elseif not stall_warning then
+    elseif not warnings.stall then
         _stall_active = false
     end
 end)

@@ -157,8 +157,23 @@ class SimConnectSource:
         self._read_oil_temp(kwargs)
         self._read_carb_heat(kwargs)
         self._read_fuel_selector(kwargs)
+        self._read_aircraft_title(kwargs)
 
         return AircraftState(**kwargs)
+
+    def _read_aircraft_title(self, kwargs):
+        """Read the TITLE SimVar and store it as a plain string."""
+        try:
+            val = self._aq.get("TITLE")
+            if val is None:
+                return
+            if isinstance(val, (bytes, bytearray)):
+                val = val.decode("utf-8", errors="replace")
+            title = str(val).strip("\x00 ")
+            if title:
+                kwargs["aircraft_title"] = title
+        except Exception:
+            pass
 
     def _safe_get(self, simvar):
         """Return the SimVar value or None if unavailable."""

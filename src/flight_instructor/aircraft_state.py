@@ -7,6 +7,9 @@ class AircraftState:
     """
 
     def __init__(self, **kwargs):
+        # Aircraft identity (used for profile auto-detection)
+        self.aircraft_title = kwargs.get("aircraft_title", "")
+
         # Position and surface
         self.latitude = kwargs.get("latitude", 0.0)
         self.longitude = kwargs.get("longitude", 0.0)

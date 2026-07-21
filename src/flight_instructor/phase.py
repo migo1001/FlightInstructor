@@ -2,13 +2,12 @@ from enum import Enum
 
 
 class Phase(Enum):
-    """All possible flight phases from cold-and-dark through securing the aircraft."""
+    """All possible flight phases from cold-and-dark through shutdown."""
 
     COLD_AND_DARK = "cold_and_dark"
     PRE_TAXI = "pre_taxi"
     TAXI_OUT = "taxi_out"
     RUNUP = "runup"
-    HOLD_SHORT = "hold_short"
     LINEUP = "lineup"
     TAKEOFF_ROLL = "takeoff_roll"
     ROTATION = "rotation"
@@ -23,4 +22,3 @@ class Phase(Enum):
     TAXI_IN = "taxi_in"
     PARKING = "parking"
     SHUTDOWN = "shutdown"
-    SECURED = "secured"

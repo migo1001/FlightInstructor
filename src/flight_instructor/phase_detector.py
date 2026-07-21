@@ -46,11 +46,34 @@ class PhaseDetector:
     PARKING_ENTRY_SECONDS = 3.0
     SHUTDOWN_SECONDS = 2.0
 
+    # Keys that Lua profile files may override via configure_phases().
+    # Maps the Lua snake_case key to the Python class-attribute name.
+    _CONFIGURABLE = {
+        "runup_rpm":            "RUNUP_RPM",
+        "runup_exit_rpm":       "RUNUP_EXIT_RPM",
+        "takeoff_throttle_pct": "TAKEOFF_THROTTLE_PCT",
+        "rollout_ias_kt":       "ROLLOUT_IAS_KT",
+        "cruise_agl_ft":        "CRUISE_AGL_FT",
+        "final_agl_ft":         "FINAL_AGL_FT",
+        "approach_agl_ft":      "APPROACH_AGL_FT",
+    }
+
     def __init__(self):
         """Initialize with the aircraft assumed to be cold and dark."""
         self.phase = Phase.COLD_AND_DARK
         self._timers = {}
         self._snapped = False
+
+    def configure(self, config):
+        """
+        Apply aircraft-specific threshold overrides supplied by a Lua profile.
+
+        config — dict of snake_case keys (matching _CONFIGURABLE) to float values.
+        Only keys present in _CONFIGURABLE are applied; unknown keys are ignored.
+        """
+        for lua_key, py_attr in self._CONFIGURABLE.items():
+            if lua_key in config:
+                setattr(self, py_attr, float(config[lua_key]))
 
     def update(self, state, timestamp):
         """Process one telemetry sample and advance the phase state machine if warranted."""

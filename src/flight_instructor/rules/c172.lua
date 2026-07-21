@@ -1,6 +1,19 @@
--- C172-specific rules.
--- Event-triggered rules fire once when the named event appears in the frame.
--- Continuous rules use closure-local flags for rising-edge detection.
+-- Cessna 172 profile.
+--
+-- configure_phases() sets aircraft-specific thresholds in the Python phase
+-- detector.  Every key here overrides the detector's class-level default.
+-- Only keys listed in PhaseDetector._CONFIGURABLE are recognised.
+
+configure_phases({
+    runup_rpm           = 1800.0,   -- minimum RPM for a valid magneto check
+    runup_exit_rpm      = 1000.0,   -- RPM below which run-up is considered done
+    takeoff_throttle_pct = 70.0,    -- throttle level that marks start of roll
+    rollout_ias_kt      = 60.0,     -- IAS below which landing roll transitions to rollout
+    cruise_agl_ft       = 1000.0,   -- AGL at which climb becomes cruise
+    final_agl_ft        = 500.0,    -- AGL at which approach becomes final
+})
+
+-- ── C172-specific scoring rules ──────────────────────────────────────────────
 
 -- Carburettor heat must be off at takeoff roll start.
 register(function()

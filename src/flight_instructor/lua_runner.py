@@ -21,10 +21,11 @@ class LuaRunner:
         navigation.malus(…)         — record a Navigation violation
         score.cap(max_score, reason)
         has_event(type_str)         — true if that EventType fired this frame
+        configure_phases(table)     — set aircraft-specific phase thresholds
         phase                       — string, e.g. "takeoff_roll"
-        stall_warning               — boolean
         engine.*                    — engine fields
         lights.*                    — light fields
+        warnings.*                  — simulator warnings (stall, overspeed …)
         position.*                  — position/motion fields
         controls.*                  — control fields
         attitude.*                  — attitude fields
@@ -36,6 +37,7 @@ class LuaRunner:
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True)
         self._rules = []
         self._current_events = set()
+        self._phase_config = {}
 
         self._categories = {
             ScoreCategory.PROCEDURES: LuaCategory(ScoreCategory.PROCEDURES, None),
@@ -51,13 +53,22 @@ class LuaRunner:
     def _install_harness(self):
         """Inject the register() function and all API objects into Lua globals."""
         rules_list = self._rules
+        phase_config = self._phase_config
 
         def register(fn):
             """Called by Lua rule files to add a rule closure."""
             rules_list.append(fn)
 
+        def configure_phases(config_table):
+            """Called by aircraft profile files to set phase detection thresholds."""
+            if config_table is None:
+                return
+            for key in config_table.keys():
+                phase_config[key] = config_table[key]
+
         g = self._lua.globals()
         g.register = register
+        g.configure_phases = configure_phases
         g.procedures = self._categories[ScoreCategory.PROCEDURES]
         g.safety = self._categories[ScoreCategory.SAFETY]
         g.aircraft_handling = self._categories[ScoreCategory.AIRCRAFT_HANDLING]
@@ -72,6 +83,10 @@ class LuaRunner:
             return type_str.upper() in current_events
 
         g.has_event = has_event
+
+    def get_phase_config(self):
+        """Return the phase threshold dict populated by configure_phases() calls."""
+        return dict(self._phase_config)
 
     def load_file(self, path):
         """Execute a Lua rule file, collecting all register() calls."""
@@ -103,7 +118,10 @@ class LuaRunner:
         g = self._lua.globals()
 
         g.phase = phase.value.lower()
-        g.stall_warning = state.stall_warning
+
+        g.warnings = self._lua.table(
+            stall=state.stall_warning,
+        )
 
         g.engine = self._lua.table(
             running=state.engine_running,

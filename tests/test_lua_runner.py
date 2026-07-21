@@ -72,12 +72,12 @@ class TestStateExposure:
 
     def test_stall_warning_true(self):
         state = AircraftState(stall_warning=True)
-        card = evaluate(self._malus_if("stall_warning"), state=state)
+        card = evaluate(self._malus_if("warnings.stall"), state=state)
         assert card.score() == 99
 
     def test_stall_warning_false(self):
         state = AircraftState(stall_warning=False)
-        card = evaluate(self._malus_if("stall_warning"), state=state)
+        card = evaluate(self._malus_if("warnings.stall"), state=state)
         assert card.score() == 100
 
     def test_engine_running(self):
@@ -279,10 +279,10 @@ class TestRisingEdge:
     STALL_RULE = """
         local _active = false
         register(function()
-            if stall_warning and not _active then
+            if warnings.stall and not _active then
                 _active = true
                 safety.malus(15, "Stall warning active.")
-            elseif not stall_warning then
+            elseif not warnings.stall then
                 _active = false
             end
         end)
