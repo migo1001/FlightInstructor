@@ -22,9 +22,10 @@ class LocationService:
     at most once every UPDATE_INTERVAL seconds and its result is cached.
     """
 
-    NEARBY_KM       = 50.0
-    UPDATE_INTERVAL = 5.0
-    EARTH_R_KM      = 6371.0
+    NEARBY_KM              = 50.0
+    UPDATE_INTERVAL_GROUND = 5.0    # seconds between searches while on the ground
+    UPDATE_INTERVAL_AIR    = 30.0   # airborne: display-only, no need for precision
+    EARTH_R_KM             = 6371.0
 
     def __init__(self, facilities=None):
         """
@@ -51,10 +52,14 @@ class LocationService:
             return ""
 
         prev_icao = self._cached_icao
-        self._refresh_if_due(lat, lon)
+        self._refresh_if_due(lat, lon, state.on_ground)
 
-        # When we arrive at a new airport, kick off an async facilities request
-        if self._cached_icao and self._cached_icao != prev_icao and self._facilities:
+        # Request facilities only when on the ground at a new airport.
+        # Airborne: ICAO is for display only; we don't need parking/runway data.
+        if (state.on_ground
+                and self._cached_icao
+                and self._cached_icao != prev_icao
+                and self._facilities):
             self._facilities.request_airport(self._cached_icao)
 
         return self._format(state)
@@ -71,10 +76,11 @@ class LocationService:
         except Exception:
             return {}
 
-    def _refresh_if_due(self, lat, lon):
+    def _refresh_if_due(self, lat, lon, on_ground):
         """Run nearest-airport search if the cache is stale."""
+        interval = self.UPDATE_INTERVAL_GROUND if on_ground else self.UPDATE_INTERVAL_AIR
         now = time.monotonic()
-        if self._last_search is None or now - self._last_search > self.UPDATE_INTERVAL:
+        if self._last_search is None or now - self._last_search > interval:
             self._search_nearest(lat, lon)
             self._last_search = now
 
