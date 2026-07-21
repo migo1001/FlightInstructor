@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "flight-instructor"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["lupa>=2.0"]
+dependencies = ["lupa>=2.0", "airportsdata>=4.0"]
 
 [project.scripts]
 flight-instructor = "flight_instructor.__main__:main"

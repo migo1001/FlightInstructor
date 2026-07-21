@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import scrolledtext
 
+from flight_instructor.location import LocationService
 from flight_instructor.phase import Phase
 from flight_instructor.score_category import ScoreCategory
 
@@ -57,6 +58,7 @@ class App(tk.Tk):
         super().__init__()
         self._session       = session
         self._source        = source
+        self._location      = LocationService()
         self._retry_count   = 0
         self._connected     = False
 
@@ -75,6 +77,7 @@ class App(tk.Tk):
     def _build_ui(self):
         """Build all widgets."""
         self._build_header()
+        self._build_location_bar()
         self._build_log()
         self._build_status()
 
@@ -110,6 +113,20 @@ class App(tk.Tk):
             font=mono, anchor="e",
         )
         self._conn_dot.pack(side=tk.RIGHT, padx=(0, 16))
+
+    def _build_location_bar(self):
+        """Slim bar showing the aircraft's current position (airport, runway, etc.)."""
+        frame = tk.Frame(self, bg=_BG_PANEL, padx=16, pady=4)
+        frame.pack(fill=tk.X, side=tk.TOP)
+
+        self._location_var = tk.StringVar(value="")
+        tk.Label(
+            frame,
+            textvariable=self._location_var,
+            fg=_FG_DIM, bg=_BG_PANEL,
+            font=tkfont.Font(family="Consolas", size=11),
+            anchor="w",
+        ).pack(side=tk.LEFT)
 
     def _build_log(self):
         """Scrolling log in the middle — violations and connection events."""
@@ -223,18 +240,20 @@ class App(tk.Tk):
             self._show_summary()
             self._session.reset()
 
-        self._update_header()
+        self._update_header(state)
         self.after(self.POLL_MS, self._poll)
 
     # ------------------------------------------------------------------
     # UI updates
     # ------------------------------------------------------------------
 
-    def _update_header(self):
-        """Refresh phase label and score."""
+    def _update_header(self, state=None):
+        """Refresh phase label, score, and location bar."""
         phase_name = self._session.phase.value.replace("_", " ").title()
         self._phase_var.set(f"Phase: {phase_name}")
         self._score_var.set(f"Score: {self._session.score}")
+        if state is not None:
+            self._location_var.set(self._location.describe(state))
 
     def _append_conn(self, message, tag):
         """Append a connection status line to the log."""

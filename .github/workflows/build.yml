@@ -21,7 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install lupa SimConnect pyinstaller
+          pip install lupa SimConnect airportsdata pyinstaller
           pip install -e .
 
       - name: Build executable
@@ -34,6 +34,7 @@ jobs:
             --collect-data flight_instructor \
             --collect-all lupa \
             --collect-all SimConnect \
+            --collect-all airportsdata \
             --hidden-import tkinter.scrolledtext \
             --hidden-import tkinter.font \
             src/flight_instructor/__main__.py

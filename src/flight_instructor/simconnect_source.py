@@ -16,6 +16,8 @@ class SimConnectSource:
 
     # SimVar name → kwargs key for AircraftState (floats / raw numerics)
     _FLOAT_VARS = {
+        "PLANE_LATITUDE":                       "latitude",
+        "PLANE_LONGITUDE":                      "longitude",
         "PLANE_ALTITUDE":                       "altitude_ft",
         "PLANE_ALT_ABOVE_GROUND":               "altitude_agl_ft",
         "GROUND_VELOCITY":                      "ground_speed_kt",
