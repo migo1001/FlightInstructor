@@ -365,6 +365,18 @@ if phase == APPROACH
 end
 ```
 
+### 5.5 Strict Layer Boundary
+
+The boundary between Python and Lua is strict and must not be blurred.
+
+Python is responsible for retrieving data and compiling information: reading SimConnect variables, normalising raw values into clean units, resolving the aircraft's position to a named location, determining the current flight phase, tracking engine and systems state, and detecting discrete events. Python produces facts.
+
+Lua is responsible for consuming those facts and making scoring decisions: reading the state model, evaluating whether a procedure was followed, deciding whether a penalty applies, setting its magnitude, and placing score caps. Lua produces verdicts.
+
+No scoring logic belongs in Python. No data-retrieval logic belongs in Lua. If a rule requires a piece of information that is not yet in the state model, the correct fix is to add it to the Python layer and expose it — not to access simulator data from inside a Lua rule.
+
+---
+
 ### 5.4 Rule Execution Model
 
 The system should avoid running every rule blindly at high frequency if possible.
